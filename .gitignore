@@ -32,6 +32,9 @@ captures/
 *.aab
 !android/gradle/wrapper/gradle-wrapper.jar
 
+# ── Node (android/tools) ─────────────────────────────────────────────────────
+node_modules/
+
 # ── .NET ────────────────────────────────────────────────────────────────────
 bin/
 obj/

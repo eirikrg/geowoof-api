@@ -1,0 +1,59 @@
+name: Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "docs/api.md"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "docs/api.md"
+      - ".github/workflows/backend.yml"
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build, format check and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Check formatting
+        run: dotnet format --verify-no-changes --no-restore
+
+      - name: Build (warnings as errors)
+        run: dotnet build --no-restore --configuration Release
+
+      # Unit, architecture and integration tests. Integration tests use Testcontainers
+      # (Docker is available on ubuntu-latest runners).
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+  docker-image:
+    name: API Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image
+        run: docker build --tag geowoof-api:ci backend

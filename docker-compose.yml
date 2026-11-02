@@ -1,0 +1,90 @@
+# Local development environment. `docker compose up --build` starts everything; the API applies
+# migrations and loads sample data (Development). See docs/setup.md.
+# Credentials here are local-only throwaway defaults; override them in .env (see .env.example).
+name: geowoof
+
+services:
+  postgres:
+    image: postgis/postgis:18-3.6
+    environment:
+      POSTGRES_DB: geowoof
+      POSTGRES_USER: ${POSTGRES_USER:-geowoof}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geowoof_dev_only}
+    ports:
+      - "5432:5432"
+    volumes:
+      # PostgreSQL 18 images keep data under /var/lib/postgresql/<major>/docker.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d geowoof"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:8.8
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible object storage (SeaweedFS; MinIO no longer publishes community images, see ADR-0010).
+  storage:
+    image: chrislusf/seaweedfs:4.52
+    command: server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    ports:
+      - "8333:8333" # S3 API
+      - "8888:8888" # Filer UI (browse stored objects)
+    volumes:
+      - storage-data:/data
+      - ./infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+
+  mailpit:
+    image: axllent/mailpit:v1.33
+    ports:
+      - "8025:8025" # Web UI with every email sent by the API
+      - "1025:1025" # SMTP
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=geowoof;Username=${POSTGRES_USER:-geowoof};Password=${POSTGRES_PASSWORD:-geowoof_dev_only}
+      ConnectionStrings__Redis: redis:6379
+      Storage__ServiceUrl: http://storage:8333
+      Storage__AccessKey: geowoof
+      Storage__SecretKey: geowoof_dev_only_secret
+      Storage__Bucket: geowoof-media
+      Storage__CreateBucketIfMissing: "true"
+      Api__ExposeDocumentation: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      storage:
+        condition: service_started
+      mailpit:
+        condition: service_started
+
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.4
+    profiles: ["observability"]
+    environment:
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "18888:18888" # Dashboard UI (logs, traces, metrics)
+
+volumes:
+  postgres-data:
+  redis-data:
+  storage-data:

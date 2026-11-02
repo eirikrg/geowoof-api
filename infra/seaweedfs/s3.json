@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "geowoof",
+      "credentials": [
+        {
+          "accessKey": "geowoof",
+          "secretKey": "geowoof_dev_only_secret"
+        }
+      ],
+      "actions": ["Admin", "Read", "List", "Tagging", "Write"]
+    }
+  ]
+}
