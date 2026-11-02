@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared abstractions for module Application layers. Must not depend on EF Core, ASP.NET Core or infrastructure SDKs. -->
+  <ItemGroup>
+    <ProjectReference Include="..\GeoWoof.BuildingBlocks.Domain\GeoWoof.BuildingBlocks.Domain.csproj" />
+    <ProjectReference Include="..\GeoWoof.BuildingBlocks.Contracts\GeoWoof.BuildingBlocks.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Scrutor" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="GeoWoof.BuildingBlocks.UnitTests" />
+  </ItemGroup>
+</Project>

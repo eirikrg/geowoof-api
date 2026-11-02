@@ -1,0 +1,10 @@
+# Test projects: relax rules that do not fit test code.
+[*.cs]
+# Test method names use underscores for readability (Given_When_Then).
+dotnet_diagnostic.CA1707.severity = none
+# xUnit requires public test classes; fixtures are shared across classes.
+dotnet_diagnostic.CA1515.severity = none
+# Argument validation is irrelevant for test helpers.
+dotnet_diagnostic.CA1062.severity = none
+# Literal strings in assertions are fine.
+dotnet_diagnostic.CA1303.severity = none

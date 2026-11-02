@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GeoWoof.Api/GeoWoof.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/GeoWoof.BuildingBlocks.Application/GeoWoof.BuildingBlocks.Application.csproj" />
+    <Project Path="src/BuildingBlocks/GeoWoof.BuildingBlocks.Contracts/GeoWoof.BuildingBlocks.Contracts.csproj" />
+    <Project Path="src/BuildingBlocks/GeoWoof.BuildingBlocks.Domain/GeoWoof.BuildingBlocks.Domain.csproj" />
+    <Project Path="src/BuildingBlocks/GeoWoof.BuildingBlocks.Infrastructure/GeoWoof.BuildingBlocks.Infrastructure.csproj" />
+    <Project Path="src/BuildingBlocks/GeoWoof.BuildingBlocks.Presentation/GeoWoof.BuildingBlocks.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/GeoWoof.ArchitectureTests/GeoWoof.ArchitectureTests.csproj" />
+    <Project Path="tests/GeoWoof.BuildingBlocks.UnitTests/GeoWoof.BuildingBlocks.UnitTests.csproj" />
+    <Project Path="tests/GeoWoof.IntegrationTests/GeoWoof.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared kernel for module Domain layers. No framework or infrastructure dependencies. -->
+</Project>

@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Base types for module Contracts (public in-process APIs and integration events). -->
+</Project>
