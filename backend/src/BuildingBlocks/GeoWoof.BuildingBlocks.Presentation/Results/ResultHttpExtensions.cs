@@ -28,20 +28,19 @@ public static class ResultHttpExtensions
         var statusCode = StatusCodeFor(error.Type);
         var extensions = new Dictionary<string, object?> { [ProblemDetailsDefaults.CodeExtension] = error.Code };
 
-        if (error is { Type: ErrorType.Validation, FieldErrors: not null })
-        {
-            return TypedResults.ValidationProblem(
+        IResult problem = error is { Type: ErrorType.Validation, FieldErrors: not null }
+            ? TypedResults.ValidationProblem(
                 error.FieldErrors.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
                 detail: error.Message,
                 title: TitleFor(statusCode),
+                extensions: extensions)
+            : TypedResults.Problem(
+                detail: error.Message,
+                statusCode: statusCode,
+                title: TitleFor(statusCode),
                 extensions: extensions);
-        }
 
-        return TypedResults.Problem(
-            detail: error.Message,
-            statusCode: statusCode,
-            title: TitleFor(statusCode),
-            extensions: extensions);
+        return error.RetryAfter is { } retryAfter ? new RetryAfterResult(problem, retryAfter) : problem;
     }
 
     public static int StatusCodeFor(ErrorType type) => type switch
@@ -52,6 +51,8 @@ public static class ResultHttpExtensions
         ErrorType.NotFound => StatusCodes.Status404NotFound,
         ErrorType.Conflict => StatusCodes.Status409Conflict,
         ErrorType.Unprocessable => StatusCodes.Status422UnprocessableEntity,
+        ErrorType.TooManyRequests => StatusCodes.Status429TooManyRequests,
+        ErrorType.Unavailable => StatusCodes.Status503ServiceUnavailable,
         _ => StatusCodes.Status500InternalServerError,
     };
 
@@ -63,6 +64,8 @@ public static class ResultHttpExtensions
         StatusCodes.Status404NotFound => "The resource was not found.",
         StatusCodes.Status409Conflict => "The request conflicts with the current state.",
         StatusCodes.Status422UnprocessableEntity => "The request cannot be processed.",
+        StatusCodes.Status429TooManyRequests => "Too many requests.",
+        StatusCodes.Status503ServiceUnavailable => "The service is temporarily unavailable.",
         _ => "The request failed.",
     };
 }

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using GeoWoof.IntegrationTests.Infrastructure;
 
@@ -9,10 +10,22 @@ public sealed class HttpConventionsTests(TestInfrastructure infrastructure)
     [Fact]
     public async Task Unknown_routes_return_problem_details_with_a_stable_code()
     {
-        await using var factory = new ApiFactory(infrastructure);
-        using var client = factory.CreateClient();
+        await using var factory = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var anonymous = factory.CreateClient();
+        using var registered = await anonymous.PostAsJsonAsync(
+            "/api/v1/auth/register",
+            new { email = "ana@example.com", password = "Password1", displayName = "Ana" },
+            TestContext.Current.CancellationToken);
+        var accessToken = JsonDocument.Parse(await registered.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))
+            .RootElement.GetProperty("accessToken").GetString()!;
+        using var client = factory.CreateAuthenticatedClient(accessToken);
 
+        // Anonymous callers get 401 for every route (the fallback policy requires authentication),
+        // so unknown routes are only reported as 404 to authenticated users.
+        using var anonymousResponse = await anonymous.GetAsync(new Uri("/api/v1/does-not-exist", UriKind.Relative), TestContext.Current.CancellationToken);
         using var response = await client.GetAsync(new Uri("/api/v1/does-not-exist", UriKind.Relative), TestContext.Current.CancellationToken);
+
+        anonymousResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
@@ -25,7 +38,7 @@ public sealed class HttpConventionsTests(TestInfrastructure infrastructure)
     [Fact]
     public async Task Documentation_is_served_when_enabled()
     {
-        await using var factory = new ApiFactory(infrastructure, new Dictionary<string, string?> { ["Api:ExposeDocumentation"] = "true" });
+        await using var factory = await ApiFactory.WithFreshDatabaseAsync(infrastructure, new Dictionary<string, string?> { ["Api:ExposeDocumentation"] = "true" });
         using var client = factory.CreateClient();
 
         using var openApi = await client.GetAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -40,7 +53,7 @@ public sealed class HttpConventionsTests(TestInfrastructure infrastructure)
     [Fact]
     public async Task Documentation_is_hidden_outside_development_by_default()
     {
-        await using var factory = new ApiFactory(infrastructure);
+        await using var factory = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken);

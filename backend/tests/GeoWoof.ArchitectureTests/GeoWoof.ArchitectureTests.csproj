@@ -12,7 +12,13 @@
     <ProjectReference Include="..\..\src\BuildingBlocks\GeoWoof.BuildingBlocks.Presentation\GeoWoof.BuildingBlocks.Presentation.csproj" />
   </ItemGroup>
   <!-- Every module project must be referenced here; ModuleBoundaryTests fails if one is missing. -->
-  <ItemGroup Label="Modules" />
+  <ItemGroup Label="Modules">
+    <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Domain\GeoWoof.Modules.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Application\GeoWoof.Modules.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Infrastructure\GeoWoof.Modules.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Presentation\GeoWoof.Modules.Identity.Presentation.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Contracts\GeoWoof.Modules.Identity.Contracts.csproj" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Shouldly" />

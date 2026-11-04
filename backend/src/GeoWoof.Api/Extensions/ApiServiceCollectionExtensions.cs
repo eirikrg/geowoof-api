@@ -2,7 +2,10 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using GeoWoof.BuildingBlocks.Application.Security;
 using GeoWoof.BuildingBlocks.Presentation.Errors;
+using GeoWoof.BuildingBlocks.Presentation.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
@@ -32,9 +35,16 @@ internal static class ApiServiceCollectionExtensions
                 .AllowAnyHeader()
                 .AllowAnyMethod()));
 
+        // Every endpoint requires an authenticated user unless it explicitly allows anonymous access.
+        services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+            .AddPolicy(AuthorizationPolicies.VerifiedEmail, policy => policy
+                .RequireAuthenticatedUser()
+                .RequireClaim(GeoWoofClaimTypes.EmailVerified, "true"));
+
         services.AddRateLimiter(_ => { });
         services.AddOptions<RateLimiterOptions>()
-            .Configure<IOptions<ApiOptions>>((rateLimiter, api) => ConfigureRateLimiter(rateLimiter, api.Value.GlobalPermitsPerMinute));
+            .Configure<IOptions<ApiOptions>>((rateLimiter, api) => ConfigureRateLimiter(rateLimiter, api.Value));
 
         services.AddOpenApi(options => options.AddDocumentTransformer((document, _, _) =>
         {
@@ -50,9 +60,12 @@ internal static class ApiServiceCollectionExtensions
         return services;
     }
 
-    private static void ConfigureRateLimiter(RateLimiterOptions options, int permitsPerMinute)
+    private static void ConfigureRateLimiter(RateLimiterOptions options, ApiOptions api)
     {
+        var permitsPerMinute = api.GlobalPermitsPerMinute;
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy(RateLimitPolicies.Authentication, context => PerIpPerMinute(context, RateLimitPolicies.Authentication, api.AuthPermitsPerMinute));
+        options.AddPolicy(RateLimitPolicies.TokenRefresh, context => PerIpPerMinute(context, RateLimitPolicies.TokenRefresh, api.RefreshPermitsPerMinute));
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             RateLimitPartition.GetTokenBucketLimiter(
                 PartitionKeyFor(context),
@@ -87,10 +100,15 @@ internal static class ApiServiceCollectionExtensions
         };
     }
 
+    private static RateLimitPartition<string> PerIpPerMinute(HttpContext context, string policy, int permits) =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            $"{policy}:{context.Connection.RemoteIpAddress?.ToString() ?? "unknown"}",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
+
     /// <summary>Authenticated users are limited per user id; anonymous clients per IP address.</summary>
     private static string PartitionKeyFor(HttpContext context)
     {
-        var userId = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = context.User.FindFirstValue(GeoWoofClaimTypes.Subject);
         return userId is not null
             ? "user:" + userId
             : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown");

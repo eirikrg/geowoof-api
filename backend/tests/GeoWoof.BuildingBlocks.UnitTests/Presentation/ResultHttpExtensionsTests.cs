@@ -16,6 +16,8 @@ public sealed class ResultHttpExtensionsTests
     [InlineData(ErrorType.NotFound, 404)]
     [InlineData(ErrorType.Conflict, 409)]
     [InlineData(ErrorType.Unprocessable, 422)]
+    [InlineData(ErrorType.TooManyRequests, 429)]
+    [InlineData(ErrorType.Unavailable, 503)]
     [InlineData(ErrorType.Failure, 500)]
     public void Error_types_map_to_status_codes(ErrorType type, int expectedStatus)
     {
@@ -52,6 +54,18 @@ public sealed class ResultHttpExtensionsTests
     }
 
     [Fact]
+    public async Task Errors_with_a_retry_delay_send_the_retry_after_header()
+    {
+        var error = Error.TooManyRequests("auth.code_cooldown", "Wait.", TimeSpan.FromSeconds(41.2));
+
+        var (status, _, body, headers) = await ExecuteWithHeadersAsync(Result.Failure(error).ToHttpResult());
+
+        status.ShouldBe(429);
+        headers.RetryAfter.ToString().ShouldBe("42");
+        body.GetProperty("code").GetString().ShouldBe("auth.code_cooldown");
+    }
+
+    [Fact]
     public async Task Success_without_value_is_no_content()
     {
         var (status, _, _) = await ExecuteAsync(Result.Success().ToHttpResult());
@@ -75,6 +89,12 @@ public sealed class ResultHttpExtensionsTests
 
     internal static async Task<(int Status, string ContentType, JsonElement Body)> ExecuteAsync(IResult result)
     {
+        var (status, contentType, body, _) = await ExecuteWithHeadersAsync(result);
+        return (status, contentType, body);
+    }
+
+    internal static async Task<(int Status, string ContentType, JsonElement Body, IHeaderDictionary Headers)> ExecuteWithHeadersAsync(IResult result)
+    {
         var services = new ServiceCollection()
             .AddLogging()
             .AddProblemDetails(options => options.CustomizeProblemDetails = ProblemDetailsDefaults.Customize)
@@ -88,6 +108,6 @@ public sealed class ResultHttpExtensionsTests
 
         body.Position = 0;
         var json = body.Length == 0 ? default : (await JsonDocument.ParseAsync(body)).RootElement.Clone();
-        return (context.Response.StatusCode, context.Response.ContentType ?? string.Empty, json);
+        return (context.Response.StatusCode, context.Response.ContentType ?? string.Empty, json, context.Response.Headers);
     }
 }

@@ -10,4 +10,6 @@ public enum ErrorType
     NotFound = 4,
     Conflict = 5,
     Unprocessable = 6,
+    TooManyRequests = 7,
+    Unavailable = 8,
 }

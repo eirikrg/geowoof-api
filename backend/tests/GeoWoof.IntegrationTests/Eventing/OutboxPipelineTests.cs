@@ -1,5 +1,5 @@
+using GeoWoof.BuildingBlocks.Application.Persistence;
 using GeoWoof.IntegrationTests.Infrastructure;
-using Microsoft.EntityFrameworkCore;
 
 namespace GeoWoof.IntegrationTests.Eventing;
 
@@ -66,7 +66,7 @@ public sealed class OutboxPipelineTests(TestInfrastructure infrastructure)
         await using var host = await EventingTestHost.StartAsync(await infrastructure.CreateDatabaseAsync(TestContext.Current.CancellationToken));
         await host.OpenKennelAsync("Duplicate");
 
-        await Should.ThrowAsync<DbUpdateException>(() => host.OpenKennelAsync("Duplicate"));
+        await Should.ThrowAsync<UniqueConstraintViolationException>(() => host.OpenKennelAsync("Duplicate"));
 
         (await host.OutboxAsync()).Count.ShouldBe(1);
     }

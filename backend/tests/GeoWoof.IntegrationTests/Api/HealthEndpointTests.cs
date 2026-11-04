@@ -9,7 +9,7 @@ public sealed class HealthEndpointTests(TestInfrastructure infrastructure)
     [Fact]
     public async Task Live_endpoint_reports_the_process_as_healthy()
     {
-        await using var factory = new ApiFactory(infrastructure);
+        await using var factory = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync(new Uri("/health/live", UriKind.Relative), TestContext.Current.CancellationToken);
@@ -22,7 +22,7 @@ public sealed class HealthEndpointTests(TestInfrastructure infrastructure)
     [Fact]
     public async Task Ready_endpoint_reports_every_dependency_once_they_are_up()
     {
-        await using var factory = new ApiFactory(infrastructure);
+        await using var factory = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
         using var client = factory.CreateClient();
 
         // The storage bucket is created in the background right after startup.
@@ -47,7 +47,7 @@ public sealed class HealthEndpointTests(TestInfrastructure infrastructure)
     [Fact]
     public async Task Ready_endpoint_returns_503_when_a_dependency_is_unreachable()
     {
-        await using var factory = new ApiFactory(infrastructure, new Dictionary<string, string?>
+        await using var factory = await ApiFactory.WithFreshDatabaseAsync(infrastructure, new Dictionary<string, string?>
         {
             ["ConnectionStrings:Redis"] = "127.0.0.1:1,connectTimeout=500,asyncTimeout=500",
         });

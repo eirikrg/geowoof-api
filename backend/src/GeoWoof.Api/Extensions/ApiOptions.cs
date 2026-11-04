@@ -16,4 +16,12 @@ internal sealed class ApiOptions
     /// <summary>Requests allowed per minute and client (user, or IP address when anonymous) across the whole API.</summary>
     [Range(1, 100_000)]
     public int GlobalPermitsPerMinute { get; set; } = 600;
+
+    /// <summary>Credential endpoints (register, login, password reset...) per minute and IP address.</summary>
+    [Range(1, 100_000)]
+    public int AuthPermitsPerMinute { get; set; } = 10;
+
+    /// <summary>Session refreshes per minute and IP address.</summary>
+    [Range(1, 100_000)]
+    public int RefreshPermitsPerMinute { get; set; } = 30;
 }

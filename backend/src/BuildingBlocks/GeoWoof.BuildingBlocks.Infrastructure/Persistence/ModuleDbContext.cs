@@ -1,7 +1,9 @@
+using GeoWoof.BuildingBlocks.Application.Persistence;
 using GeoWoof.BuildingBlocks.Domain.Entities;
 using GeoWoof.BuildingBlocks.Infrastructure.Inbox;
 using GeoWoof.BuildingBlocks.Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace GeoWoof.BuildingBlocks.Infrastructure.Persistence;
 
@@ -18,6 +20,26 @@ public abstract class ModuleDbContext(DbContextOptions options) : DbContext(opti
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
+
+    /// <summary>
+    /// Saves changes and translates provider exceptions into persistence exceptions that Application code
+    /// can handle (<see cref="UniqueConstraintViolationException"/>, <see cref="ConcurrencyConflictException"/>).
+    /// </summary>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new ConcurrencyConflictException("The data was modified by another operation.", exception);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } postgres)
+        {
+            throw new UniqueConstraintViolationException(postgres.ConstraintName, "A unique constraint was violated.", exception);
+        }
+    }
 
     protected sealed override void OnModelCreating(ModelBuilder modelBuilder)
     {

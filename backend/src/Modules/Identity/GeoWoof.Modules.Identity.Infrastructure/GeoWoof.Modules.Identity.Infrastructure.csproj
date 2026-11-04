@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\GeoWoof.BuildingBlocks.Infrastructure\GeoWoof.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\GeoWoof.Modules.Identity.Application\GeoWoof.Modules.Identity.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
+    <PackageReference Include="Google.Apis.Auth" />
+    <PackageReference Include="MailKit" />
+    <!-- Design-time services for `dotnet ef migrations` (IdentityDbContextDesignTimeFactory). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="GeoWoof.Modules.Identity.UnitTests" />
+    <InternalsVisibleTo Include="GeoWoof.IntegrationTests" />
+  </ItemGroup>
+</Project>

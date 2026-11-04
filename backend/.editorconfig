@@ -57,3 +57,8 @@ dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.CA1716.severity = none
 # `EventHandler`/`Collection`-style suffixes are intentional in CQRS naming (IDomainEventHandler, IIntegrationEventHandler).
 dotnet_diagnostic.CA1711.severity = none
+
+# EF Core migrations are generated code: analyzers and style rules do not apply.
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

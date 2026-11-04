@@ -10,9 +10,19 @@
     <Project Path="src/BuildingBlocks/GeoWoof.BuildingBlocks.Presentation/GeoWoof.BuildingBlocks.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/GeoWoof.Modules.Identity.Application/GeoWoof.Modules.Identity.Application.csproj" />
+    <Project Path="src/Modules/Identity/GeoWoof.Modules.Identity.Contracts/GeoWoof.Modules.Identity.Contracts.csproj" />
+    <Project Path="src/Modules/Identity/GeoWoof.Modules.Identity.Domain/GeoWoof.Modules.Identity.Domain.csproj" />
+    <Project Path="src/Modules/Identity/GeoWoof.Modules.Identity.Infrastructure/GeoWoof.Modules.Identity.Infrastructure.csproj" />
+    <Project Path="src/Modules/Identity/GeoWoof.Modules.Identity.Presentation/GeoWoof.Modules.Identity.Presentation.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/GeoWoof.ArchitectureTests/GeoWoof.ArchitectureTests.csproj" />
     <Project Path="tests/GeoWoof.BuildingBlocks.UnitTests/GeoWoof.BuildingBlocks.UnitTests.csproj" />
     <Project Path="tests/GeoWoof.IntegrationTests/GeoWoof.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Modules/">
+    <Project Path="tests/Modules/GeoWoof.Modules.Identity.UnitTests/GeoWoof.Modules.Identity.UnitTests.csproj" />
   </Folder>
 </Solution>

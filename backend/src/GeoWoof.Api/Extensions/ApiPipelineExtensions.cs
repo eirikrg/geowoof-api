@@ -13,6 +13,8 @@ internal static class ApiPipelineExtensions
         app.UseStatusCodePages();
         app.UseGeoWoofRequestLogging();
         app.UseCors();
+        app.UseAuthentication();
+        app.UseAuthorization();
         app.UseRateLimiter();
         return app;
     }
@@ -27,13 +29,13 @@ internal static class ApiPipelineExtensions
         {
             Predicate = _ => false,
             ResponseWriter = HealthResponseWriter.WriteAsync,
-        }).DisableRateLimiting();
+        }).DisableRateLimiting().AllowAnonymous();
 
         app.MapHealthChecks("/health/ready", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains(InfrastructureServiceCollectionExtensions.ReadinessTag),
             ResponseWriter = HealthResponseWriter.WriteAsync,
-        }).DisableRateLimiting();
+        }).DisableRateLimiting().AllowAnonymous();
 
         return app;
     }
@@ -46,8 +48,8 @@ internal static class ApiPipelineExtensions
             return app;
         }
 
-        app.MapOpenApi().DisableRateLimiting();
-        app.MapScalarApiReference(options => options.WithTitle("GeoWoof API")).DisableRateLimiting();
+        app.MapOpenApi().DisableRateLimiting().AllowAnonymous();
+        app.MapScalarApiReference(options => options.WithTitle("GeoWoof API")).DisableRateLimiting().AllowAnonymous();
         return app;
     }
 }

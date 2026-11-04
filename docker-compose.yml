@@ -63,6 +63,12 @@ services:
       Storage__Bucket: geowoof-media
       Storage__CreateBucketIfMissing: "true"
       Api__ExposeDocumentation: "true"
+      # Local-only signing key; production keys come from a secret store (docs/setup.md).
+      Auth__Jwt__SigningKey: ${JWT_SIGNING_KEY:-geowoof-local-development-signing-key-change-me}
+      Auth__Google__ClientIds__0: ${GOOGLE_WEB_CLIENT_ID:-}
+      Email__SmtpHost: mailpit
+      Email__SmtpPort: "1025"
+      Email__SmtpSecurity: None
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
       - "8080:8080"
