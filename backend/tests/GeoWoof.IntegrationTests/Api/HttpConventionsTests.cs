@@ -12,13 +12,7 @@ public sealed class HttpConventionsTests(TestInfrastructure infrastructure)
     {
         await using var factory = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
         using var anonymous = factory.CreateClient();
-        using var registered = await anonymous.PostAsJsonAsync(
-            "/api/v1/auth/register",
-            new { email = "ana@example.com", password = "Password1", displayName = "Ana" },
-            TestContext.Current.CancellationToken);
-        var accessToken = JsonDocument.Parse(await registered.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))
-            .RootElement.GetProperty("accessToken").GetString()!;
-        using var client = factory.CreateAuthenticatedClient(accessToken);
+        using var client = await CreateRegisteredClientAsync(factory, anonymous);
 
         // Anonymous callers get 401 for every route (the fallback policy requires authentication),
         // so unknown routes are only reported as 404 to authenticated users.
@@ -54,10 +48,26 @@ public sealed class HttpConventionsTests(TestInfrastructure infrastructure)
     public async Task Documentation_is_hidden_outside_development_by_default()
     {
         await using var factory = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
-        using var client = factory.CreateClient();
+        using var anonymous = factory.CreateClient();
+        using var client = await CreateRegisteredClientAsync(factory, anonymous);
 
+        // The fallback policy answers anonymous callers before routing: only an authenticated
+        // request can tell that the route does not exist.
+        using var anonymousResponse = await anonymous.GetAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken);
         using var response = await client.GetAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken);
 
+        anonymousResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    private static async Task<HttpClient> CreateRegisteredClientAsync(ApiFactory factory, HttpClient anonymous)
+    {
+        using var registered = await anonymous.PostAsJsonAsync(
+            "/api/v1/auth/register",
+            new { email = "ana@example.com", password = "Password1", displayName = "Ana" },
+            TestContext.Current.CancellationToken);
+        var accessToken = JsonDocument.Parse(await registered.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))
+            .RootElement.GetProperty("accessToken").GetString()!;
+        return factory.CreateAuthenticatedClient(accessToken);
     }
 }
