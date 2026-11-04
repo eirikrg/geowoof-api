@@ -192,7 +192,8 @@ public sealed class MediaWorkflowTests
 
     [Theory]
     [InlineData("image/jpeg", 1, "PetAvatar", true)]
-    [InlineData("image/heic", 15728640, "UserAvatar", true)]
+    [InlineData("image/webp", 15728640, "UserAvatar", true)]
+    [InlineData("image/heic", 1, "PetAvatar", false)]
     [InlineData("image/gif", 1, "PetAvatar", false)]
     [InlineData("IMAGE/JPEG", 1, "PetAvatar", false)]
     [InlineData("image/jpeg", 0, "PetAvatar", false)]

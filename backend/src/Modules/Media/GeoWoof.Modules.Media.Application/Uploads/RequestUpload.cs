@@ -12,14 +12,14 @@ public sealed record RequestUploadCommand(Guid OwnerId, string ContentType, long
 
 internal sealed class RequestUploadCommandValidator : AbstractValidator<RequestUploadCommand>
 {
-    private static readonly string[] AllowedContentTypes = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+    private static readonly string[] AllowedContentTypes = ["image/jpeg", "image/png", "image/webp"];
 
     public RequestUploadCommandValidator(IOptions<MediaSettings> settings)
     {
         var maxSize = settings.Value.MaxSizeBytes;
         RuleFor(command => command.ContentType)
             .Must(contentType => AllowedContentTypes.Contains(contentType, StringComparer.Ordinal))
-            .WithMessage("Use image/jpeg, image/png, image/webp or image/heic.");
+            .WithMessage("Use image/jpeg, image/png or image/webp.");
         RuleFor(command => command.SizeBytes)
             .InclusiveBetween(1, maxSize)
             .WithMessage($"The image must have between 1 byte and {maxSize} bytes.");
