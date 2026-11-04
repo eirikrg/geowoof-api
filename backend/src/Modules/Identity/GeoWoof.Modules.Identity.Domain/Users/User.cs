@@ -30,6 +30,8 @@ public sealed record UserDeletedDomainEvent(Guid UserId) : IDomainEvent;
 public sealed class User : AggregateRoot
 {
     public const int DisplayNameMaxLength = 50;
+    public const int BioMaxLength = 300;
+    public const int CityMaxLength = 100;
 
     private readonly List<ExternalLogin> _externalLogins = [];
 
@@ -58,6 +60,13 @@ public sealed class User : AggregateRoot
     public Username? Username { get; private set; }
 
     public string DisplayName { get; private set; }
+
+    public string? Bio { get; private set; }
+
+    public string? City { get; private set; }
+
+    /// <summary>Image in the Media module.</summary>
+    public Guid? AvatarAssetId { get; private set; }
 
     public Language Language { get; private set; }
 
@@ -173,6 +182,15 @@ public sealed class User : AggregateRoot
     }
 
     public void ChangeLanguage(Language language) => Language = language;
+
+    /// <summary>Replaces the public profile: empty values clear the field.</summary>
+    public void UpdateProfile(string displayName, string? bio, string? city, Guid? avatarAssetId)
+    {
+        ChangeDisplayName(displayName);
+        Bio = string.IsNullOrWhiteSpace(bio) ? null : bio.Trim();
+        City = string.IsNullOrWhiteSpace(city) ? null : city.Trim();
+        AvatarAssetId = avatarAssetId;
+    }
 
     /// <summary>Marks the account for deletion; the repository removes it in the same unit of work.</summary>
     public void Delete() => Raise(new UserDeletedDomainEvent(Id));

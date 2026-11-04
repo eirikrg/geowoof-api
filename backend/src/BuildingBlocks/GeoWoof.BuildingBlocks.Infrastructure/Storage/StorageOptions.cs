@@ -12,6 +12,12 @@ public sealed class StorageOptions
     [Url]
     public string ServiceUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Endpoint that clients reach for signed links (for example <c>http://10.0.2.2:8333</c> from the
+    /// Android emulator). A signature covers the host, so it cannot be rewritten later. Defaults to <see cref="ServiceUrl"/>.
+    /// </summary>
+    public string? PublicEndpoint { get; set; }
+
     [Required]
     public string AccessKey { get; set; } = string.Empty;
 

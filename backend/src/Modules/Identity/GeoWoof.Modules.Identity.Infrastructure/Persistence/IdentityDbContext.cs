@@ -50,6 +50,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(user => user.Username).IsUnique();
 
         builder.Property(user => user.DisplayName).HasMaxLength(User.DisplayNameMaxLength).IsRequired();
+        builder.Property(user => user.Bio).HasMaxLength(User.BioMaxLength);
+        builder.Property(user => user.City).HasMaxLength(User.CityMaxLength);
         builder.Property(user => user.PasswordHash).HasMaxLength(512);
         builder.Property(user => user.Language).HasConversion<string>().HasMaxLength(8);
 

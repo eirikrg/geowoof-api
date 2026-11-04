@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\GeoWoof.BuildingBlocks.Infrastructure\GeoWoof.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\GeoWoof.Modules.Pets.Application\GeoWoof.Modules.Pets.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Draws the sample pet photos. The native library comes with the Media module. -->
+    <PackageReference Include="SkiaSharp" />
+    <!-- Design-time services for `dotnet ef migrations` (PetsDbContextDesignTimeFactory). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="GeoWoof.Modules.Pets.UnitTests" />
+    <InternalsVisibleTo Include="GeoWoof.IntegrationTests" />
+  </ItemGroup>
+</Project>

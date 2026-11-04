@@ -9,6 +9,9 @@
     <ProjectReference Include="..\..\src\GeoWoof.Api\GeoWoof.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\Modules\GeoWoof.Modules.Media.UnitTests\TestImages.cs" Link="Infrastructure\TestImages.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />

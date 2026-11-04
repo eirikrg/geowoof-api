@@ -31,6 +31,7 @@ public static class StorageServiceCollectionExtensions
             return new AmazonS3Client(new BasicAWSCredentials(options.AccessKey, options.SecretKey), config);
         });
 
+        services.AddSingleton<StorageBucket>();
         services.AddHostedService<StorageBucketInitializer>();
         return services;
     }

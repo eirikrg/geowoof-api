@@ -4,6 +4,10 @@ using GeoWoof.BuildingBlocks.Infrastructure;
 using GeoWoof.BuildingBlocks.Infrastructure.Persistence;
 using GeoWoof.Modules.Identity.Infrastructure;
 using GeoWoof.Modules.Identity.Presentation;
+using GeoWoof.Modules.Media.Infrastructure;
+using GeoWoof.Modules.Media.Presentation;
+using GeoWoof.Modules.Pets.Infrastructure;
+using GeoWoof.Modules.Pets.Presentation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +17,8 @@ builder.Services.AddGeoWoofInfrastructure(builder.Environment);
 
 // Modules (Infrastructure: AddXxxModule), then the handler decorators, applied once to every module.
 builder.Services.AddIdentityModule();
+builder.Services.AddMediaModule();
+builder.Services.AddPetsModule();
 builder.Services.DecorateApplicationHandlers();
 
 var app = builder.Build();
@@ -24,6 +30,8 @@ app.MapGeoWoofDocumentation();
 // Module endpoints (Presentation: MapXxxEndpoints) under the versioned group.
 var api = app.MapGroup("/api/v1");
 api.MapIdentityEndpoints();
+api.MapMediaEndpoints();
+api.MapPetsEndpoints();
 
 await app.InitializeDatabasesAsync();
 await app.RunAsync();

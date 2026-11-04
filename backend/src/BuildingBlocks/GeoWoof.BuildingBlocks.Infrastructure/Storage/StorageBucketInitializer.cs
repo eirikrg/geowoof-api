@@ -8,48 +8,60 @@ using Microsoft.Extensions.Options;
 namespace GeoWoof.BuildingBlocks.Infrastructure.Storage;
 
 /// <summary>
-/// When <see cref="StorageOptions.CreateBucketIfMissing"/> is enabled, creates the media bucket in the
-/// background, retrying while the storage server starts. Startup is never blocked by it.
+/// When <see cref="StorageOptions.CreateBucketIfMissing"/> is enabled, creates the media bucket,
+/// retrying while the storage server starts. Without that option, the bucket is assumed to exist.
 /// </summary>
-internal sealed partial class StorageBucketInitializer(
+public sealed partial class StorageBucket(
     IAmazonS3 s3,
     IOptions<StorageOptions> options,
     TimeProvider timeProvider,
-    ILogger<StorageBucketInitializer> logger) : BackgroundService
+    ILogger<StorageBucket> logger) : IDisposable
 {
     private const int MaxAttempts = 30;
     private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(2);
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private volatile bool _ready;
+
+    /// <summary>Completes once the bucket can be used, or throws after the last attempt.</summary>
+    public async Task EnsureReadyAsync(CancellationToken cancellationToken)
     {
-        var bucket = options.Value.Bucket;
-        if (!options.Value.CreateBucketIfMissing)
+        if (_ready || !options.Value.CreateBucketIfMissing)
         {
             return;
         }
 
-        for (var attempt = 1; !stoppingToken.IsCancellationRequested; attempt++)
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_ready)
+            {
+                await CreateWithRetriesAsync(options.Value.Bucket, cancellationToken);
+                _ready = true;
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public void Dispose() => _gate.Dispose();
+
+    private async Task CreateWithRetriesAsync(string bucket, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
         {
             try
             {
-                await EnsureBucketAsync(bucket, stoppingToken);
+                await EnsureBucketAsync(bucket, cancellationToken);
                 LogBucketReady(logger, bucket);
                 return;
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            catch (Exception exception) when (attempt < MaxAttempts && exception is AmazonServiceException or HttpRequestException or AmazonClientException)
             {
-                return;
-            }
-            catch (Exception exception) when (exception is AmazonServiceException or HttpRequestException or AmazonClientException)
-            {
-                if (attempt >= MaxAttempts)
-                {
-                    LogBucketFailed(logger, exception, bucket, attempt);
-                    return;
-                }
-
                 LogBucketRetry(logger, bucket, attempt, exception.Message);
-                await Task.Delay(RetryDelay, timeProvider, stoppingToken);
+                await Task.Delay(RetryDelay, timeProvider, cancellationToken);
             }
         }
     }
@@ -70,7 +82,27 @@ internal sealed partial class StorageBucketInitializer(
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Storage bucket {Bucket} not ready yet (attempt {Attempt}): {Reason}")]
     private static partial void LogBucketRetry(ILogger logger, string bucket, int attempt, string reason);
+}
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Could not create storage bucket {Bucket} after {Attempt} attempts")]
-    private static partial void LogBucketFailed(ILogger logger, Exception exception, string bucket, int attempt);
+/// <summary>Prepares the bucket in the background when the host starts. Startup is never blocked by it.</summary>
+internal sealed partial class StorageBucketInitializer(StorageBucket bucket, ILogger<StorageBucketInitializer> logger) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await bucket.EnsureReadyAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // The host is stopping.
+        }
+        catch (Exception exception) when (exception is AmazonServiceException or HttpRequestException or AmazonClientException)
+        {
+            LogBucketFailed(logger, exception);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Could not prepare the storage bucket")]
+    private static partial void LogBucketFailed(ILogger logger, Exception exception);
 }

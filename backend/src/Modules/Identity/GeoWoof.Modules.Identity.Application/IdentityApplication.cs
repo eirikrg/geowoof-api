@@ -1,6 +1,7 @@
 using GeoWoof.BuildingBlocks.Application;
 using GeoWoof.Modules.Identity.Application.EmailVerification;
 using GeoWoof.Modules.Identity.Application.Sessions;
+using GeoWoof.Modules.Identity.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace GeoWoof.Modules.Identity.Application;
@@ -11,6 +12,7 @@ public static class IdentityApplication
     public static IServiceCollection AddIdentityApplication(this IServiceCollection services)
     {
         services.AddApplicationHandlers(typeof(IdentityApplication).Assembly);
+        services.AddScoped<IIdentityApi, IdentityApi>();
         services.AddScoped<SessionService>();
         services.AddScoped<VerificationCodeService>();
         services.AddScoped<IdentityEmailDispatcher>();

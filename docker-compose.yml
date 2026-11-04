@@ -58,6 +58,8 @@ services:
       ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=geowoof;Username=${POSTGRES_USER:-geowoof};Password=${POSTGRES_PASSWORD:-geowoof_dev_only}
       ConnectionStrings__Redis: redis:6379
       Storage__ServiceUrl: http://storage:8333
+      # Host that clients reach for signed links. Emulator: 10.0.2.2. Physical device: see docs/setup.md.
+      Storage__PublicEndpoint: ${STORAGE_PUBLIC_ENDPOINT:-http://10.0.2.2:8333}
       Storage__AccessKey: geowoof
       Storage__SecretKey: geowoof_dev_only_secret
       Storage__Bucket: geowoof-media

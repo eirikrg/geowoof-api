@@ -7,6 +7,7 @@ using GeoWoof.Modules.Identity.Application.Account;
 using GeoWoof.Modules.Identity.Application.Authentication;
 using GeoWoof.Modules.Identity.Application.EmailVerification;
 using GeoWoof.Modules.Identity.Application.Passwords;
+using GeoWoof.Modules.Identity.Application.Profiles;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -53,11 +54,40 @@ public static class IdentityEndpoints
         me.MapDelete(string.Empty, DeleteAccountAsync)
             .Produces(StatusCodes.Status204NoContent).ProducesValidationProblem().ProducesProblem(StatusCodes.Status401Unauthorized);
 
+        me.MapGet("/profile", GetMyProfileAsync).Produces<ProfileDto>();
+        me.MapPut("/profile", ReplaceMyProfileAsync)
+            .Produces<ProfileDto>().ProducesValidationProblem().ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        api.MapGet("/users/{id:guid}", GetPublicProfileAsync).WithTags("Account")
+            .Produces<ProfileDto>().ProducesProblem(StatusCodes.Status404NotFound);
+
         api.MapGet("/usernames/availability", CheckUsernameAsync).WithTags("Account")
             .Produces<UsernameAvailabilityDto>();
 
         return api;
     }
+
+    private static async Task<IResult> GetMyProfileAsync(
+        ClaimsPrincipal user,
+        IQueryHandler<GetMyProfileQuery, ProfileDto> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new GetMyProfileQuery(user.GetUserId()), cancellationToken)).ToHttpResult(TypedResults.Ok);
+
+    private static async Task<IResult> ReplaceMyProfileAsync(
+        ReplaceProfileRequest request,
+        ClaimsPrincipal user,
+        ICommandHandler<ReplaceMyProfileCommand, ProfileDto> handler,
+        CancellationToken cancellationToken)
+    {
+        var command = new ReplaceMyProfileCommand(user.GetUserId(), request.DisplayName, request.Bio, request.City, request.AvatarAssetId);
+        return (await handler.Handle(command, cancellationToken)).ToHttpResult(TypedResults.Ok);
+    }
+
+    private static async Task<IResult> GetPublicProfileAsync(
+        Guid id,
+        IQueryHandler<GetPublicProfileQuery, ProfileDto> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new GetPublicProfileQuery(id), cancellationToken)).ToHttpResult(TypedResults.Ok);
 
     private static async Task<IResult> GetProvidersAsync(
         IQueryHandler<GetAuthProvidersQuery, AuthProvidersDto> handler,

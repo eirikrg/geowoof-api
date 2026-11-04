@@ -18,6 +18,16 @@
     <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Infrastructure\GeoWoof.Modules.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Presentation\GeoWoof.Modules.Identity.Presentation.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Contracts\GeoWoof.Modules.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Domain\GeoWoof.Modules.Media.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Application\GeoWoof.Modules.Media.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Infrastructure\GeoWoof.Modules.Media.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Presentation\GeoWoof.Modules.Media.Presentation.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Contracts\GeoWoof.Modules.Media.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Pets\GeoWoof.Modules.Pets.Domain\GeoWoof.Modules.Pets.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Pets\GeoWoof.Modules.Pets.Application\GeoWoof.Modules.Pets.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Pets\GeoWoof.Modules.Pets.Infrastructure\GeoWoof.Modules.Pets.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Pets\GeoWoof.Modules.Pets.Presentation\GeoWoof.Modules.Pets.Presentation.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Pets\GeoWoof.Modules.Pets.Contracts\GeoWoof.Modules.Pets.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3" />

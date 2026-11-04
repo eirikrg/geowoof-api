@@ -8,6 +8,7 @@ using GeoWoof.Modules.Identity.Application.Abstractions;
 using GeoWoof.Modules.Identity.Domain.Sessions;
 using GeoWoof.Modules.Identity.Domain.Users;
 using GeoWoof.Modules.Identity.Domain.Verification;
+using GeoWoof.Modules.Media.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
@@ -40,6 +41,7 @@ internal sealed class IdentityTestHost : IAsyncDisposable
         services.AddSingleton<ISecretGenerator>(Secrets);
         services.AddSingleton<IGoogleIdTokenValidator>(Google);
         services.AddSingleton<IEmailSender>(Emails);
+        services.AddSingleton<IMediaApi>(Media);
         services.AddSingleton<IIntegrationEventPublisher>(Published);
         services.AddIdentityApplication();
         services.DecorateApplicationHandlers();
@@ -47,6 +49,8 @@ internal sealed class IdentityTestHost : IAsyncDisposable
     }
 
     public FakeTimeProvider Time { get; } = new(new DateTimeOffset(2026, 11, 2, 10, 0, 0, TimeSpan.Zero));
+
+    public FakeMediaApi Media { get; } = new();
 
     public InMemoryUsers Users { get; } = new();
 
@@ -112,6 +116,37 @@ internal sealed class IdentityTestHost : IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() => _provider.DisposeAsync();
+}
+
+internal sealed class FakeMediaApi : IMediaApi
+{
+    public List<Guid> Attached { get; } = [];
+
+    public List<Guid> Released { get; } = [];
+
+    public MediaAttachFailure? AttachFailure { get; set; }
+
+    public Task<MediaAttachFailure?> AttachAsync(Guid assetId, Guid ownerId, MediaUsage usage, CancellationToken cancellationToken)
+    {
+        if (AttachFailure is null)
+        {
+            Attached.Add(assetId);
+        }
+
+        return Task.FromResult(AttachFailure);
+    }
+
+    public Task ReleaseAsync(Guid assetId, Guid ownerId, CancellationToken cancellationToken)
+    {
+        Released.Add(assetId);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyDictionary<Guid, MediaImage>> GetImagesAsync(IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, MediaImage>>(assetIds.ToDictionary(id => id, id => new MediaImage(id, "thumb", "medium")));
+
+    public Task<Guid> ImportAsync(Guid ownerId, MediaUsage usage, ReadOnlyMemory<byte> content, string contentType, CancellationToken cancellationToken) =>
+        Task.FromResult(Guid.CreateVersion7());
 }
 
 internal sealed class InMemoryUsers : IUserRepository

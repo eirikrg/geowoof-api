@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\GeoWoof.BuildingBlocks.Infrastructure\GeoWoof.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\GeoWoof.Modules.Media.Application\GeoWoof.Modules.Media.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
+    <!-- Design-time services for `dotnet ef migrations` (MediaDbContextDesignTimeFactory). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="GeoWoof.Modules.Media.UnitTests" />
+    <InternalsVisibleTo Include="GeoWoof.IntegrationTests" />
+  </ItemGroup>
+</Project>

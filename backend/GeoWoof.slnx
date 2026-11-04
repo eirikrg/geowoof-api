@@ -17,6 +17,20 @@
     <Project Path="src/Modules/Identity/GeoWoof.Modules.Identity.Infrastructure/GeoWoof.Modules.Identity.Infrastructure.csproj" />
     <Project Path="src/Modules/Identity/GeoWoof.Modules.Identity.Presentation/GeoWoof.Modules.Identity.Presentation.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Media/">
+    <Project Path="src/Modules/Media/GeoWoof.Modules.Media.Application/GeoWoof.Modules.Media.Application.csproj" />
+    <Project Path="src/Modules/Media/GeoWoof.Modules.Media.Contracts/GeoWoof.Modules.Media.Contracts.csproj" />
+    <Project Path="src/Modules/Media/GeoWoof.Modules.Media.Domain/GeoWoof.Modules.Media.Domain.csproj" />
+    <Project Path="src/Modules/Media/GeoWoof.Modules.Media.Infrastructure/GeoWoof.Modules.Media.Infrastructure.csproj" />
+    <Project Path="src/Modules/Media/GeoWoof.Modules.Media.Presentation/GeoWoof.Modules.Media.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Pets/">
+    <Project Path="src/Modules/Pets/GeoWoof.Modules.Pets.Application/GeoWoof.Modules.Pets.Application.csproj" />
+    <Project Path="src/Modules/Pets/GeoWoof.Modules.Pets.Contracts/GeoWoof.Modules.Pets.Contracts.csproj" />
+    <Project Path="src/Modules/Pets/GeoWoof.Modules.Pets.Domain/GeoWoof.Modules.Pets.Domain.csproj" />
+    <Project Path="src/Modules/Pets/GeoWoof.Modules.Pets.Infrastructure/GeoWoof.Modules.Pets.Infrastructure.csproj" />
+    <Project Path="src/Modules/Pets/GeoWoof.Modules.Pets.Presentation/GeoWoof.Modules.Pets.Presentation.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/GeoWoof.ArchitectureTests/GeoWoof.ArchitectureTests.csproj" />
     <Project Path="tests/GeoWoof.BuildingBlocks.UnitTests/GeoWoof.BuildingBlocks.UnitTests.csproj" />
@@ -24,5 +38,7 @@
   </Folder>
   <Folder Name="/tests/Modules/">
     <Project Path="tests/Modules/GeoWoof.Modules.Identity.UnitTests/GeoWoof.Modules.Identity.UnitTests.csproj" />
+    <Project Path="tests/Modules/GeoWoof.Modules.Media.UnitTests/GeoWoof.Modules.Media.UnitTests.csproj" />
+    <Project Path="tests/Modules/GeoWoof.Modules.Pets.UnitTests/GeoWoof.Modules.Pets.UnitTests.csproj" />
   </Folder>
 </Solution>

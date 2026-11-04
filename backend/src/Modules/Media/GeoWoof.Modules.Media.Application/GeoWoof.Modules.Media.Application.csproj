@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\GeoWoof.BuildingBlocks.Application\GeoWoof.BuildingBlocks.Application.csproj" />
+    <ProjectReference Include="..\GeoWoof.Modules.Media.Domain\GeoWoof.Modules.Media.Domain.csproj" />
+    <ProjectReference Include="..\GeoWoof.Modules.Media.Contracts\GeoWoof.Modules.Media.Contracts.csproj" />
+    <ProjectReference Include="..\..\Identity\GeoWoof.Modules.Identity.Contracts\GeoWoof.Modules.Identity.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="GeoWoof.Modules.Media.Infrastructure" />
+    <InternalsVisibleTo Include="GeoWoof.Modules.Media.UnitTests" />
+  </ItemGroup>
+</Project>

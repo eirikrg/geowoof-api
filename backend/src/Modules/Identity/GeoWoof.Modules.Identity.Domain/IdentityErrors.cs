@@ -5,6 +5,9 @@ namespace GeoWoof.Modules.Identity.Domain;
 /// <summary>Business errors of the Identity module. Codes are part of the API contract (docs/api.md).</summary>
 public static class IdentityErrors
 {
+    public static readonly Error UserNotFound =
+        Error.NotFound("identity.user_not_found", "The user does not exist.");
+
     public static readonly Error InvalidCredentials =
         Error.Unauthorized("auth.invalid_credentials", "The email or password is incorrect.");
 
