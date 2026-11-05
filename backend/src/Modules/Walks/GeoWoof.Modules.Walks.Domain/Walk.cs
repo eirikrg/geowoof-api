@@ -1,13 +1,7 @@
 using GeoWoof.BuildingBlocks.Domain.Entities;
+using GeoWoof.BuildingBlocks.Domain.Visibility;
 
 namespace GeoWoof.Modules.Walks.Domain;
-
-public enum WalkVisibility
-{
-    Everyone = 0,
-    Friends = 1,
-    OnlyMe = 2,
-}
 
 public sealed record WalkRecordedDomainEvent(Guid WalkId, Guid OwnerId, IReadOnlyList<Guid> PetIds, int DistanceM, DateTimeOffset StartedAt) : IDomainEvent;
 
@@ -29,7 +23,7 @@ public sealed class WalkPhoto
 }
 
 /// <summary>What can change after a walk has been saved.</summary>
-public sealed record WalkDetails(WalkVisibility Visibility, string? Note, IReadOnlyList<Guid> PhotoAssetIds);
+public sealed record WalkDetails(ContentVisibility Visibility, string? Note, IReadOnlyList<Guid> PhotoAssetIds);
 
 /// <summary>
 /// A finished walk. Its id is generated on the phone, so that retrying an upload never duplicates it.
@@ -85,7 +79,7 @@ public sealed class Walk : AggregateRoot
 
     public string TimeZone { get; private set; }
 
-    public WalkVisibility Visibility { get; private set; }
+    public ContentVisibility Visibility { get; private set; }
 
     public string? Note { get; private set; }
 
@@ -155,6 +149,8 @@ public sealed class Walk : AggregateRoot
                 && pair.First.TimeOffsetsMs.SequenceEqual(pair.Second.TimeOffsetsMs))
             && _pets.TrueForAll(pet => petIds.Contains(pet.PetId));
     }
+
+    public bool IsVisibleTo(ViewerRelation viewer) => VisibilityRules.CanSee(viewer, Visibility);
 
     /// <summary>The last edit wins: an older one, delivered late, must be ignored.</summary>
     public bool IsStale(DateTimeOffset updatedAt) => updatedAt < UpdatedAt;

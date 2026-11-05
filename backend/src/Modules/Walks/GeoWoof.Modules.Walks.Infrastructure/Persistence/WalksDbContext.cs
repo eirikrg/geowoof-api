@@ -1,4 +1,5 @@
 using System.Text.Json;
+using GeoWoof.BuildingBlocks.Domain.Visibility;
 using GeoWoof.BuildingBlocks.Infrastructure.Persistence;
 using GeoWoof.Modules.Walks.Application.Abstractions;
 using GeoWoof.Modules.Walks.Domain;
@@ -121,12 +122,17 @@ internal sealed class WalkRepository(WalksDbContext dbContext) : IWalkRepository
     public Task<Walk?> GetByIdAsync(Guid walkId, CancellationToken cancellationToken) =>
         WalksWithChildren.FirstOrDefaultAsync(walk => walk.Id == walkId, cancellationToken);
 
-    public async Task<IReadOnlyList<WalkSummaryRow>> GetPageAsync(Guid ownerId, Guid? petId, WalkPageCursor? after, int take, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WalkSummaryRow>> GetPageAsync(Guid ownerId, Guid? petId, IReadOnlyCollection<ContentVisibility>? visibilities, WalkPageCursor? after, int take, CancellationToken cancellationToken)
     {
         var query = WalksWithChildren.AsNoTracking().Where(walk => walk.OwnerId == ownerId);
         if (petId is { } pet)
         {
             query = query.Where(walk => walk.Pets.Any(walkPet => walkPet.PetId == pet));
+        }
+
+        if (visibilities is not null)
+        {
+            query = query.Where(walk => visibilities.Contains(walk.Visibility));
         }
 
         if (after is not null)
@@ -177,6 +183,12 @@ internal sealed class WalkRepository(WalksDbContext dbContext) : IWalkRepository
             row.Photos,
             row.UpdatedAt)).ToList();
     }
+
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<WalkSegment>>> GetTracksAsync(IReadOnlyCollection<Guid> walkIds, CancellationToken cancellationToken) =>
+        await dbContext.Walks.AsNoTracking()
+            .Where(walk => walkIds.Contains(walk.Id))
+            .Select(walk => new { walk.Id, walk.Segments })
+            .ToDictionaryAsync(walk => walk.Id, walk => walk.Segments, cancellationToken);
 
     public async Task<IReadOnlyList<WalkStatsRow>> GetStatsRowsAsync(Guid ownerId, Guid? petId, CancellationToken cancellationToken)
     {

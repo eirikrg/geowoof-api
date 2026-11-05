@@ -61,6 +61,7 @@ public sealed class ApiFactory(TestInfrastructure infrastructure, IReadOnlyDicti
             ["Email:SmtpHost"] = "smtp.invalid",
             ["Api:AuthPermitsPerMinute"] = "10000",
             ["Api:RefreshPermitsPerMinute"] = "10000",
+            ["Api:SocialWritesPermitsPerMinute"] = "10000",
         };
         foreach (var (key, value) in overrides ?? new Dictionary<string, string?>())
         {

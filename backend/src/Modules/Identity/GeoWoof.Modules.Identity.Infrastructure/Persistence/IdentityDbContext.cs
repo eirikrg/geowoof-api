@@ -23,6 +23,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasPostgresExtension("pg_trgm");
+        modelBuilder.HasPostgresExtension("unaccent");
         modelBuilder.ApplyConfiguration(new UserConfiguration());
         modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
         modelBuilder.ApplyConfiguration(new VerificationCodeConfiguration());

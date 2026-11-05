@@ -7,6 +7,9 @@ public static class PetsErrors
 {
     public static readonly Error NotFound = Error.NotFound("pets.not_found", "The pet does not exist.");
 
+    /// <summary>The same answer for a person who does not exist and for one with a block in either direction.</summary>
+    public static readonly Error UserNotFound = Error.NotFound("identity.user_not_found", "The user does not exist.");
+
     public static readonly Error NotOwner = Error.Forbidden("pets.not_owner", "Only the owner can do this.");
 
     public static readonly Error LimitReached =

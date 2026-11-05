@@ -1,3 +1,4 @@
+using GeoWoof.BuildingBlocks.Application.Paging;
 using GeoWoof.Modules.Pets.Domain;
 
 namespace GeoWoof.Modules.Pets.Application.Abstractions;
@@ -10,6 +11,11 @@ public interface IPetRepository
 
     /// <summary>The pets of a person, oldest first.</summary>
     Task<IReadOnlyList<Pet>> GetByOwnerAsync(Guid ownerId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Pet>> GetByIdsAsync(IReadOnlyCollection<Guid> petIds, CancellationToken cancellationToken);
+
+    /// <summary>The pets that match the text, from the best match to the worst, after a position.</summary>
+    Task<IReadOnlyList<RelevancePosition>> SearchAsync(string text, IReadOnlyCollection<Guid> excludedOwnerIds, RelevancePosition after, int take, CancellationToken cancellationToken);
 
     Task<int> CountByOwnerAsync(Guid ownerId, CancellationToken cancellationToken);
 

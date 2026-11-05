@@ -39,6 +39,11 @@ public static class PetsEndpoints
         ArgumentNullException.ThrowIfNull(api);
 
         var pets = api.MapGroup("/pets").WithTags("Pets");
+        api.MapGet("/users/{id:guid}/pets", GetUserPetsAsync).WithTags("Pets")
+            .Produces<PagedResponse<PetDto>>().ProducesProblem(StatusCodes.Status404NotFound);
+        api.MapGet("/search/pets", SearchPetsAsync).WithTags("Search")
+            .Produces<PagedResponse<PetSearchResultDto>>().ProducesValidationProblem();
+
         pets.MapGet(string.Empty, GetPetsAsync).Produces<PagedResponse<PetDto>>();
         pets.MapPost(string.Empty, CreatePetAsync)
             .Produces<PetDto>(StatusCodes.Status201Created).ProducesValidationProblem().ProducesProblem(StatusCodes.Status422UnprocessableEntity);
@@ -60,12 +65,27 @@ public static class PetsEndpoints
         return api;
     }
 
+    private static async Task<IResult> GetUserPetsAsync(
+        Guid id,
+        ClaimsPrincipal user,
+        IQueryHandler<GetUserPetsQuery, PagedResponse<PetDto>> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new GetUserPetsQuery(user.GetUserId(), id), cancellationToken)).ToHttpResult(TypedResults.Ok);
+
+    private static async Task<IResult> SearchPetsAsync(
+        string? q,
+        int? limit,
+        string? cursor,
+        ClaimsPrincipal user,
+        IQueryHandler<SearchPetsQuery, PagedResponse<PetSearchResultDto>> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new SearchPetsQuery(user.GetUserId(), q ?? string.Empty, limit, cursor), cancellationToken)).ToHttpResult(TypedResults.Ok);
+
     private static async Task<IResult> GetPetsAsync(
-        Guid? ownerId,
         ClaimsPrincipal user,
         IQueryHandler<GetPetsQuery, PagedResponse<PetDto>> handler,
         CancellationToken cancellationToken) =>
-        (await handler.Handle(new GetPetsQuery(user.GetUserId(), ownerId), cancellationToken)).ToHttpResult(TypedResults.Ok);
+        (await handler.Handle(new GetPetsQuery(user.GetUserId()), cancellationToken)).ToHttpResult(TypedResults.Ok);
 
     private static async Task<IResult> CreatePetAsync(
         PetRequest request,

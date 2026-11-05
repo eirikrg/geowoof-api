@@ -1,3 +1,4 @@
+using GeoWoof.BuildingBlocks.Application.Paging;
 using GeoWoof.Modules.Identity.Domain.Sessions;
 using GeoWoof.Modules.Identity.Domain.Users;
 using GeoWoof.Modules.Identity.Domain.Verification;
@@ -17,6 +18,12 @@ public interface IUserRepository
     Task<bool> EmailExistsAsync(Email email, CancellationToken cancellationToken);
 
     Task<bool> UsernameExistsAsync(Username username, CancellationToken cancellationToken);
+
+    /// <summary>Those accounts that exist and have finished the onboarding.</summary>
+    Task<IReadOnlyList<User>> GetPublicByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
+
+    /// <summary>The accounts that match the text, from the best match to the worst, after a position.</summary>
+    Task<IReadOnlyList<RelevancePosition>> SearchAsync(string text, IReadOnlyCollection<Guid> excludedIds, RelevancePosition after, int take, CancellationToken cancellationToken);
 
     void Add(User user);
 

@@ -82,7 +82,7 @@ public sealed class PetsEndpointsTests(TestInfrastructure infrastructure)
 
         (await ana.Client.GetJsonAsync($"/api/v1/pets/{petId}")).GetProperty("microchip").GetString().ShouldBe("941000024567890");
         (await bea.Client.GetJsonAsync($"/api/v1/pets/{petId}")).GetProperty("microchip").ValueKind.ShouldBe(JsonValueKind.Null);
-        var ofAna = await bea.Client.GetJsonAsync($"/api/v1/pets?ownerId={ana.Id}");
+        var ofAna = await bea.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/pets");
         ofAna.GetProperty("items")[0].GetProperty("microchip").ValueKind.ShouldBe(JsonValueKind.Null);
         ofAna.GetProperty("nextCursor").ValueKind.ShouldBe(JsonValueKind.Null);
         (await bea.Client.GetJsonAsync("/api/v1/pets")).GetProperty("items").GetArrayLength().ShouldBe(0);
@@ -214,6 +214,7 @@ public sealed class PetsEndpointsTests(TestInfrastructure infrastructure)
         var photo = await MediaTestClient.UploadReadyAsync(api, ana.Client, TestImages.Jpeg(100, 100), "PetAvatar");
         var assetId = photo.GetProperty("id").GetGuid();
         using var anaPet = await ana.Client.PostJsonAsync("/api/v1/pets", Luna(assetId));
+        var anaPetId = (await anaPet.JsonAsync()).GetProperty("id").GetGuid();
         using var beaPet = await bea.Client.PostJsonAsync("/api/v1/pets", Luna());
 
         using var request = new HttpRequestMessage(HttpMethod.Delete, new Uri("/api/v1/me", UriKind.Relative))
@@ -224,8 +225,12 @@ public sealed class PetsEndpointsTests(TestInfrastructure infrastructure)
         deleted.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         await Eventually.Until(
-            async () => (await bea.Client.GetJsonAsync($"/api/v1/pets?ownerId={ana.Id}")).GetProperty("items").GetArrayLength(),
-            count => count == 0,
+            async () =>
+            {
+                using var pet = await bea.Client.GetAsync(new Uri($"/api/v1/pets/{anaPetId}", UriKind.Relative), TestContext.Current.CancellationToken);
+                return pet.StatusCode;
+            },
+            status => status == HttpStatusCode.NotFound,
             "the pets of the deleted account are erased");
         var storage = api.Services.GetRequiredService<IMediaStorage>();
         await Eventually.Until(

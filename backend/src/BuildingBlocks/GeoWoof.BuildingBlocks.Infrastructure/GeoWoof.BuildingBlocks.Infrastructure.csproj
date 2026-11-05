@@ -11,6 +11,8 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite" />
     <PackageReference Include="EFCore.NamingConventions" />
     <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
     <PackageReference Include="AWSSDK.S3" />
   </ItemGroup>
   <ItemGroup>

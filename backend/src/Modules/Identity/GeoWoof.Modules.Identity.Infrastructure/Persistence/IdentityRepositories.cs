@@ -1,3 +1,5 @@
+using GeoWoof.BuildingBlocks.Application.Paging;
+using GeoWoof.BuildingBlocks.Infrastructure.Persistence;
 using GeoWoof.Modules.Identity.Application.Abstractions;
 using GeoWoof.Modules.Identity.Domain.Sessions;
 using GeoWoof.Modules.Identity.Domain.Users;
@@ -24,6 +26,36 @@ internal sealed class UserRepository(IdentityDbContext dbContext) : IUserReposit
 
     public Task<bool> UsernameExistsAsync(Username username, CancellationToken cancellationToken) =>
         dbContext.Users.AnyAsync(user => user.Username == username, cancellationToken);
+
+    public async Task<IReadOnlyList<User>> GetPublicByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken) =>
+        await dbContext.Users.AsNoTracking().Where(user => userIds.Contains(user.Id) && user.Username != null).ToListAsync(cancellationToken);
+
+    public Task<IReadOnlyList<RelevancePosition>> SearchAsync(string text, IReadOnlyCollection<Guid> excludedIds, RelevancePosition after, int take, CancellationToken cancellationToken)
+    {
+        var pattern = TextSearch.ContainsPattern(text);
+        var excluded = excludedIds.ToArray();
+        return TextSearch.RunAsync(
+            dbContext,
+            $"""
+            SELECT r.id, r.score
+            FROM (
+                SELECT u.id, round(GREATEST(
+                    word_similarity(identity.normalize_search_text({text}), identity.normalize_search_text(u.display_name)),
+                    word_similarity(identity.normalize_search_text({text}), identity.normalize_search_text(u.username)))::numeric, 4) AS score
+                FROM identity.users AS u
+                WHERE u.username IS NOT NULL
+                    AND NOT (u.id = ANY({excluded}))
+                    AND (identity.normalize_search_text({text}) <% identity.normalize_search_text(u.display_name)
+                        OR identity.normalize_search_text({text}) <% identity.normalize_search_text(u.username)
+                        OR identity.normalize_search_text(u.display_name) LIKE identity.normalize_search_text({pattern})
+                        OR identity.normalize_search_text(u.username) LIKE identity.normalize_search_text({pattern}))
+            ) AS r
+            WHERE (r.score, r.id) < ({after.Score}, {after.Id})
+            ORDER BY r.score DESC, r.id DESC
+            LIMIT {take}
+            """,
+            cancellationToken);
+    }
 
     public void Add(User user) => dbContext.Users.Add(user);
 

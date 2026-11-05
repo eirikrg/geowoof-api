@@ -13,12 +13,12 @@ internal sealed record TestUser(HttpClient Client, Guid Id, string Email) : IDis
     public const string Password = "Password1";
 
     /// <summary>Registers an account and, unless told otherwise, finishes its onboarding.</summary>
-    public static async Task<TestUser> RegisterAsync(ApiFactory api, string email, string? username = null, bool onboard = true)
+    public static async Task<TestUser> RegisterAsync(ApiFactory api, string email, string? username = null, bool onboard = true, string displayName = "Ana")
     {
         using var anonymous = api.CreateClient();
         using var registered = await anonymous.PostAsJsonAsync(
             "/api/v1/auth/register",
-            new { email, password = Password, displayName = "Ana" },
+            new { email, password = Password, displayName },
             TestContext.Current.CancellationToken);
         registered.StatusCode.ShouldBe(HttpStatusCode.Created);
         var session = await registered.JsonAsync();
@@ -35,6 +35,15 @@ internal sealed record TestUser(HttpClient Client, Guid Id, string Email) : IDis
         }
 
         return user;
+    }
+
+    /// <summary>Verifies the email with the code sent to it, and from then on uses the token that says so.</summary>
+    public async Task VerifyEmailAsync(ApiFactory api)
+    {
+        using var verified = await Client.PostJsonAsync("/api/v1/auth/email/verify", new { code = api.Emails.LastCodeFor(Email) });
+        verified.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var session = await verified.JsonAsync();
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session.GetProperty("accessToken").GetString());
     }
 
     public void Dispose() => Client.Dispose();

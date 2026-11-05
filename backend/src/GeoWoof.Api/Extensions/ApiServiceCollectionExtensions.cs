@@ -70,6 +70,7 @@ internal static class ApiServiceCollectionExtensions
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
         options.AddPolicy(RateLimitPolicies.Authentication, context => PerIpPerMinute(context, RateLimitPolicies.Authentication, api.AuthPermitsPerMinute));
         options.AddPolicy(RateLimitPolicies.TokenRefresh, context => PerIpPerMinute(context, RateLimitPolicies.TokenRefresh, api.RefreshPermitsPerMinute));
+        options.AddPolicy(RateLimitPolicies.SocialWrites, context => PerUserPerMinute(context, RateLimitPolicies.SocialWrites, api.SocialWritesPermitsPerMinute));
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             RateLimitPartition.GetTokenBucketLimiter(
                 PartitionKeyFor(context),
@@ -110,6 +111,11 @@ internal static class ApiServiceCollectionExtensions
             _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
 
     /// <summary>Authenticated users are limited per user id; anonymous clients per IP address.</summary>
+    private static RateLimitPartition<string> PerUserPerMinute(HttpContext context, string policy, int permits) =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            $"{policy}:{PartitionKeyFor(context)}",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
+
     private static string PartitionKeyFor(HttpContext context)
     {
         var userId = context.User.FindFirstValue(GeoWoofClaimTypes.Subject);

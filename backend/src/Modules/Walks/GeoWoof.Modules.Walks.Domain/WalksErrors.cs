@@ -28,5 +28,8 @@ public static class WalksErrors
 
     public static readonly Error NotPetOwner = Error.Forbidden("pets.not_owner", "Only the owner can do this.");
 
+    /// <summary>The same answer for a person who does not exist and for one with a block in either direction.</summary>
+    public static readonly Error UserNotFound = Error.NotFound("identity.user_not_found", "The user does not exist.");
+
     public static readonly Error InvalidCursor = Error.Validation("request.invalid", "The cursor is not valid.");
 }

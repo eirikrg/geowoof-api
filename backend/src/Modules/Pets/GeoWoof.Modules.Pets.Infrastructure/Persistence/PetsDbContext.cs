@@ -1,3 +1,4 @@
+using GeoWoof.BuildingBlocks.Application.Paging;
 using GeoWoof.BuildingBlocks.Infrastructure.Persistence;
 using GeoWoof.Modules.Pets.Application.Abstractions;
 using GeoWoof.Modules.Pets.Domain;
@@ -20,6 +21,8 @@ public sealed class PetsDbContext(DbContextOptions<PetsDbContext> options) : Mod
 
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasPostgresExtension("pg_trgm");
+        modelBuilder.HasPostgresExtension("unaccent");
         modelBuilder.ApplyConfiguration(new PetConfiguration());
         modelBuilder.ApplyConfiguration(new PetWeightEntryConfiguration());
     }
@@ -85,6 +88,35 @@ internal sealed class PetRepository(PetsDbContext dbContext) : IPetRepository
 
     public async Task<IReadOnlyList<Pet>> GetByOwnerAsync(Guid ownerId, CancellationToken cancellationToken) =>
         await dbContext.Pets.Where(pet => pet.OwnerId == ownerId).OrderBy(pet => pet.CreatedAt).ThenBy(pet => pet.Id).ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Pet>> GetByIdsAsync(IReadOnlyCollection<Guid> petIds, CancellationToken cancellationToken) =>
+        await dbContext.Pets.AsNoTracking().Where(pet => petIds.Contains(pet.Id)).ToListAsync(cancellationToken);
+
+    public Task<IReadOnlyList<RelevancePosition>> SearchAsync(string text, IReadOnlyCollection<Guid> excludedOwnerIds, RelevancePosition after, int take, CancellationToken cancellationToken)
+    {
+        var pattern = TextSearch.ContainsPattern(text);
+        var excluded = excludedOwnerIds.ToArray();
+        return TextSearch.RunAsync(
+            dbContext,
+            $"""
+            SELECT r.id, r.score
+            FROM (
+                SELECT p.id, round(GREATEST(
+                    word_similarity(pets.normalize_search_text({text}), pets.normalize_search_text(p.name)),
+                    word_similarity(pets.normalize_search_text({text}), pets.normalize_search_text(COALESCE(p.breed, ''))))::numeric, 4) AS score
+                FROM pets.pets AS p
+                WHERE NOT (p.owner_id = ANY({excluded}))
+                    AND (pets.normalize_search_text({text}) <% pets.normalize_search_text(p.name)
+                        OR pets.normalize_search_text({text}) <% pets.normalize_search_text(p.breed)
+                        OR pets.normalize_search_text(p.name) LIKE pets.normalize_search_text({pattern})
+                        OR pets.normalize_search_text(p.breed) LIKE pets.normalize_search_text({pattern}))
+            ) AS r
+            WHERE (r.score, r.id) < ({after.Score}, {after.Id})
+            ORDER BY r.score DESC, r.id DESC
+            LIMIT {take}
+            """,
+            cancellationToken);
+    }
 
     public Task<int> CountByOwnerAsync(Guid ownerId, CancellationToken cancellationToken) =>
         dbContext.Pets.CountAsync(pet => pet.OwnerId == ownerId, cancellationToken);

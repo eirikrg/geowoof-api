@@ -41,6 +41,11 @@ internal sealed partial class PetsDevelopmentSeeder(
             new PetDetails("Rocky", PetSpecies.Dog, null, "Pastor alemán", new DateOnly(2019, 11, 5), PetSex.Male, PetSize.Large, "Negro y fuego", true, "941000098765432", null),
             34.5m,
             new SKColor(0xA8, 0x6A, 0xB8)),
+        (
+            "jose@geowoof.dev",
+            new PetDetails("Ñora", PetSpecies.Dog, null, "Galgo español", new DateOnly(2022, 6, 15), PetSex.Female, PetSize.Large, "Canela", true, null, null),
+            24.8m,
+            new SKColor(0xC4, 0x5A, 0x4A)),
     ];
 
     public int Order => 10;

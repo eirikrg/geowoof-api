@@ -1,6 +1,7 @@
 using GeoWoof.BuildingBlocks.Application;
 using GeoWoof.BuildingBlocks.Application.Events;
 using GeoWoof.BuildingBlocks.Application.Messaging;
+using GeoWoof.BuildingBlocks.Application.Paging;
 using GeoWoof.BuildingBlocks.Contracts;
 using GeoWoof.BuildingBlocks.Domain.Results;
 using GeoWoof.Modules.Identity.Application;
@@ -9,6 +10,7 @@ using GeoWoof.Modules.Identity.Domain.Sessions;
 using GeoWoof.Modules.Identity.Domain.Users;
 using GeoWoof.Modules.Identity.Domain.Verification;
 using GeoWoof.Modules.Media.Contracts;
+using GeoWoof.Modules.Social.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
@@ -42,6 +44,7 @@ internal sealed class IdentityTestHost : IAsyncDisposable
         services.AddSingleton<IGoogleIdTokenValidator>(Google);
         services.AddSingleton<IEmailSender>(Emails);
         services.AddSingleton<IMediaApi>(Media);
+        services.AddSingleton<IRelationshipsApi>(Relationships);
         services.AddSingleton<IIntegrationEventPublisher>(Published);
         services.AddIdentityApplication();
         services.DecorateApplicationHandlers();
@@ -51,6 +54,8 @@ internal sealed class IdentityTestHost : IAsyncDisposable
     public FakeTimeProvider Time { get; } = new(new DateTimeOffset(2026, 11, 2, 10, 0, 0, TimeSpan.Zero));
 
     public FakeMediaApi Media { get; } = new();
+
+    public FakeRelationships Relationships { get; } = new();
 
     public InMemoryUsers Users { get; } = new();
 
@@ -167,6 +172,19 @@ internal sealed class InMemoryUsers : IUserRepository
 
     public Task<bool> UsernameExistsAsync(Username username, CancellationToken cancellationToken) =>
         Task.FromResult(Items.Exists(user => user.Username == username));
+
+    public Task<IReadOnlyList<User>> GetPublicByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<User>>(Items.Where(user => userIds.Contains(user.Id) && user.HasCompletedOnboarding).ToList());
+
+    /// <summary>The real search is SQL and has its own integration tests: this finds people by exact name, in order.</summary>
+    public Task<IReadOnlyList<RelevancePosition>> SearchAsync(string text, IReadOnlyCollection<Guid> excludedIds, RelevancePosition after, int take, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<RelevancePosition>>(Items
+            .Where(user => user.DisplayName == text && user.HasCompletedOnboarding && !excludedIds.Contains(user.Id))
+            .Select(user => new RelevancePosition(1, user.Id))
+            .OrderByDescending(hit => hit.Id)
+            .Where(hit => hit.Id.CompareTo(after.Id) < 0 || after.Id == Guid.Empty)
+            .Take(take)
+            .ToList());
 
     public void Add(User user) => Items.Add(user);
 
@@ -301,4 +319,44 @@ internal sealed class CapturingPublisher : IIntegrationEventPublisher
     public List<IIntegrationEvent> Events { get; } = [];
 
     public void Publish(IIntegrationEvent integrationEvent) => Events.Add(integrationEvent);
+}
+
+/// <summary>Who is related to whom, in the tests of a module that only knows the contract of Social.</summary>
+internal sealed class FakeRelationships : IRelationshipsApi
+{
+    private readonly HashSet<(Guid, Guid)> _friends = [];
+    private readonly HashSet<(Guid, Guid)> _blocks = [];
+
+    public void Befriend(Guid first, Guid second)
+    {
+        _friends.Add((first, second));
+        _friends.Add((second, first));
+    }
+
+    public void Block(Guid blocker, Guid blocked) => _blocks.Add((blocker, blocked));
+
+    public Task<Relationship> GetRelationshipAsync(Guid viewerId, Guid targetId, CancellationToken cancellationToken)
+    {
+        if (viewerId == targetId)
+        {
+            return Task.FromResult(Relationship.Self);
+        }
+
+        if (_blocks.Contains((viewerId, targetId)) || _blocks.Contains((targetId, viewerId)))
+        {
+            return Task.FromResult(Relationship.Blocked);
+        }
+
+        return Task.FromResult(_friends.Contains((viewerId, targetId)) ? Relationship.Friend : Relationship.None);
+    }
+
+    public Task<IReadOnlyCollection<Guid>> GetHiddenUserIdsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<Guid> hidden = _blocks
+            .Where(block => block.Item1 == userId || block.Item2 == userId)
+            .Select(block => block.Item1 == userId ? block.Item2 : block.Item1)
+            .Distinct()
+            .ToList();
+        return Task.FromResult(hidden);
+    }
 }

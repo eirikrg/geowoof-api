@@ -2,32 +2,60 @@ using FluentValidation;
 using GeoWoof.BuildingBlocks.Application.Messaging;
 using GeoWoof.BuildingBlocks.Application.Paging;
 using GeoWoof.BuildingBlocks.Domain.Results;
+using GeoWoof.Modules.Identity.Contracts;
 using GeoWoof.Modules.Media.Contracts;
 using GeoWoof.Modules.Pets.Application.Abstractions;
 using GeoWoof.Modules.Pets.Domain;
+using GeoWoof.Modules.Social.Contracts;
 
 namespace GeoWoof.Modules.Pets.Application.Pets;
 
-/// <summary>The pets of a person: the viewer's own when <paramref name="OwnerId"/> is omitted.</summary>
-public sealed record GetPetsQuery(Guid ViewerId, Guid? OwnerId) : IQuery<PagedResponse<PetDto>>;
+/// <summary>The viewer's own pets.</summary>
+public sealed record GetPetsQuery(Guid ViewerId) : IQuery<PagedResponse<PetDto>>;
 
 internal sealed class GetPetsQueryHandler(IPetRepository pets, IMediaApi media) : IQueryHandler<GetPetsQuery, PagedResponse<PetDto>>
 {
     public async Task<Result<PagedResponse<PetDto>>> Handle(GetPetsQuery query, CancellationToken cancellationToken)
     {
-        var found = await pets.GetByOwnerAsync(query.OwnerId ?? query.ViewerId, cancellationToken);
+        var found = await pets.GetByOwnerAsync(query.ViewerId, cancellationToken);
+        return new PagedResponse<PetDto>(await PetMapper.ToDtosAsync(found, query.ViewerId, media, cancellationToken), NextCursor: null);
+    }
+}
+
+/// <summary>The pets of someone else. With a block in either direction, that person does not exist.</summary>
+public sealed record GetUserPetsQuery(Guid ViewerId, Guid UserId) : IQuery<PagedResponse<PetDto>>;
+
+internal sealed class GetUserPetsQueryHandler(IPetRepository pets, IIdentityApi identity, IRelationshipsApi relationships, IMediaApi media)
+    : IQueryHandler<GetUserPetsQuery, PagedResponse<PetDto>>
+{
+    public async Task<Result<PagedResponse<PetDto>>> Handle(GetUserPetsQuery query, CancellationToken cancellationToken)
+    {
+        var relationship = await relationships.GetRelationshipAsync(query.ViewerId, query.UserId, cancellationToken);
+        var users = await identity.GetPublicUsersAsync([query.UserId], cancellationToken);
+        if (relationship == Relationship.Blocked || !users.ContainsKey(query.UserId))
+        {
+            return PetsErrors.UserNotFound;
+        }
+
+        var found = await pets.GetByOwnerAsync(query.UserId, cancellationToken);
         return new PagedResponse<PetDto>(await PetMapper.ToDtosAsync(found, query.ViewerId, media, cancellationToken), NextCursor: null);
     }
 }
 
 public sealed record GetPetQuery(Guid ViewerId, Guid PetId) : IQuery<PetDto>;
 
-internal sealed class GetPetQueryHandler(IPetRepository pets, IMediaApi media) : IQueryHandler<GetPetQuery, PetDto>
+internal sealed class GetPetQueryHandler(IPetRepository pets, IRelationshipsApi relationships, IMediaApi media) : IQueryHandler<GetPetQuery, PetDto>
 {
-    public async Task<Result<PetDto>> Handle(GetPetQuery query, CancellationToken cancellationToken) =>
-        await pets.GetByIdAsync(query.PetId, cancellationToken) is { } pet
-            ? await PetMapper.ToDtoAsync(pet, query.ViewerId, media, cancellationToken)
-            : PetsErrors.NotFound;
+    public async Task<Result<PetDto>> Handle(GetPetQuery query, CancellationToken cancellationToken)
+    {
+        var pet = await pets.GetByIdAsync(query.PetId, cancellationToken);
+        if (pet is null || await relationships.GetRelationshipAsync(query.ViewerId, pet.OwnerId, cancellationToken) == Relationship.Blocked)
+        {
+            return PetsErrors.NotFound;
+        }
+
+        return await PetMapper.ToDtoAsync(pet, query.ViewerId, media, cancellationToken);
+    }
 }
 
 public sealed record CreatePetCommand(Guid OwnerId, PetInput Input) : ICommand<PetDto>;

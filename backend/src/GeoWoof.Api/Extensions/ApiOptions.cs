@@ -24,4 +24,8 @@ internal sealed class ApiOptions
     /// <summary>Session refreshes per minute and IP address.</summary>
     [Range(1, 100_000)]
     public int RefreshPermitsPerMinute { get; set; } = 30;
+
+    /// <summary>What reaches another person (friend requests, reports) per minute and user.</summary>
+    [Range(1, 100_000)]
+    public int SocialWritesPermitsPerMinute { get; set; } = 30;
 }

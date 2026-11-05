@@ -8,6 +8,7 @@ using GeoWoof.Modules.Pets.Application.Events;
 using GeoWoof.Modules.Pets.Application.Pets;
 using GeoWoof.Modules.Pets.Application.Weights;
 using GeoWoof.Modules.Pets.Domain;
+using GeoWoof.Modules.Social.Contracts;
 using Microsoft.Extensions.Time.Testing;
 
 namespace GeoWoof.Modules.Pets.UnitTests;
@@ -21,9 +22,87 @@ public sealed class PetHandlerTests
     private readonly InMemoryPets _pets = new();
     private readonly InMemoryWeights _weights = new();
     private readonly FakeMedia _media = new();
+    private readonly FakeRelationships _relationships = new();
+    private readonly FakeIdentity _identity = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    private async Task<PetDto> CreateNamedAsync(Guid owner, string name)
+    {
+        var created = await Create().Handle(new CreatePetCommand(owner, Input() with { Name = name }), Token);
+        return created.Value;
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_block_in_either_direction_hides_the_pets(bool anaBlocks)
+    {
+        var luna = await CreateNamedAsync(Ana, "Luna");
+        _identity.Add(Ana, "ana");
+        _relationships.Block(anaBlocks ? Ana : Bea, anaBlocks ? Bea : Ana);
+
+        (await new GetPetQueryHandler(_pets, _relationships, _media).Handle(new GetPetQuery(Bea, luna.Id), Token)).Error.ShouldBe(PetsErrors.NotFound);
+        (await new GetUserPetsQueryHandler(_pets, _identity, _relationships, _media).Handle(new GetUserPetsQuery(Bea, Ana), Token)).Error.ShouldBe(PetsErrors.UserNotFound);
+        (await new GetPetQueryHandler(_pets, _relationships, _media).Handle(new GetPetQuery(Ana, luna.Id), Token)).IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task The_pets_of_someone_who_does_not_exist_are_not_found()
+    {
+        (await new GetUserPetsQueryHandler(_pets, _identity, _relationships, _media).Handle(new GetUserPetsQuery(Bea, Ana), Token)).Error.ShouldBe(PetsErrors.UserNotFound);
+    }
+
+    [Fact]
+    public async Task The_search_shows_the_owner_and_leaves_out_the_viewer_and_the_blocked()
+    {
+        var carlos = Guid.CreateVersion7();
+        var dani = Guid.CreateVersion7();
+        var visible = await CreateNamedAsync(Ana, "Luna");
+        await CreateNamedAsync(Bea, "Luna");
+        await CreateNamedAsync(carlos, "Luna");
+        await CreateNamedAsync(dani, "Luna");
+        _identity.Add(Ana, "ana");
+        _identity.Add(Bea, "bea");
+        _relationships.Block(Bea, carlos);
+        _relationships.Block(dani, Bea);
+
+        var result = await new SearchPetsQueryHandler(_pets, _identity, _relationships, _media).Handle(new SearchPetsQuery(Bea, " Luna ", null, null), Token);
+
+        var found = result.Value.Items.Single();
+        found.Id.ShouldBe(visible.Id);
+        found.Owner.Username.ShouldBe("ana");
+    }
+
+    [Fact]
+    public async Task The_search_leaves_out_pets_whose_owner_is_being_deleted()
+    {
+        await CreateNamedAsync(Ana, "Luna");
+
+        var result = await new SearchPetsQueryHandler(_pets, _identity, _relationships, _media).Handle(new SearchPetsQuery(Bea, "Luna", null, null), Token);
+
+        result.Value.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_search_goes_through_pages_and_rejects_what_is_not_valid()
+    {
+        await CreateNamedAsync(Ana, "Luna");
+        await CreateNamedAsync(Ana, "Luna");
+        _identity.Add(Ana, "ana");
+        var handler = new SearchPetsQueryHandler(_pets, _identity, _relationships, _media);
+
+        var first = await handler.Handle(new SearchPetsQuery(Bea, "Luna", 1, null), Token);
+        var second = await handler.Handle(new SearchPetsQuery(Bea, "Luna", 1, first.Value.NextCursor), Token);
+
+        first.Value.NextCursor.ShouldNotBeNull();
+        second.Value.NextCursor.ShouldBeNull();
+        second.Value.Items.Single().Id.ShouldNotBe(first.Value.Items.Single().Id);
+        (await handler.Handle(new SearchPetsQuery(Bea, "Luna", null, "!!"), Token)).Error.ShouldBe(PetsErrors.InvalidCursor);
+        new SearchPetsQueryValidator().Validate(new SearchPetsQuery(Bea, "a", null, null)).IsValid.ShouldBeFalse();
+        new SearchPetsQueryValidator().Validate(new SearchPetsQuery(Bea, new string('a', 51), null, null)).IsValid.ShouldBeFalse();
+    }
 
     [Fact]
     public async Task Creating_a_pet_attaches_its_photo_for_the_owner()
@@ -67,14 +146,16 @@ public sealed class PetHandlerTests
     public async Task The_microchip_is_hidden_from_other_people()
     {
         var created = (await Create().Handle(new CreatePetCommand(Ana, Input() with { Microchip = "941000024567890" }), Token)).Value;
-        var handler = new GetPetQueryHandler(_pets, _media);
+        var handler = new GetPetQueryHandler(_pets, _relationships, _media);
         var list = new GetPetsQueryHandler(_pets, _media);
+        var ofUser = new GetUserPetsQueryHandler(_pets, _identity, _relationships, _media);
+        _identity.Add(Ana, "ana");
 
         (await handler.Handle(new GetPetQuery(Ana, created.Id), Token)).Value.Microchip.ShouldBe("941000024567890");
         (await handler.Handle(new GetPetQuery(Bea, created.Id), Token)).Value.Microchip.ShouldBeNull();
-        (await list.Handle(new GetPetsQuery(Ana, null), Token)).Value.Items.ShouldHaveSingleItem().Microchip.ShouldBe("941000024567890");
-        (await list.Handle(new GetPetsQuery(Bea, Ana), Token)).Value.Items.ShouldHaveSingleItem().Microchip.ShouldBeNull();
-        (await list.Handle(new GetPetsQuery(Bea, null), Token)).Value.Items.ShouldBeEmpty();
+        (await list.Handle(new GetPetsQuery(Ana), Token)).Value.Items.ShouldHaveSingleItem().Microchip.ShouldBe("941000024567890");
+        (await ofUser.Handle(new GetUserPetsQuery(Bea, Ana), Token)).Value.Items.ShouldHaveSingleItem().Microchip.ShouldBeNull();
+        (await list.Handle(new GetPetsQuery(Bea), Token)).Value.Items.ShouldBeEmpty();
     }
 
     [Fact]
@@ -231,6 +312,19 @@ internal sealed class InMemoryPets : IPetRepository
     public Task<IReadOnlyList<Pet>> GetByOwnerAsync(Guid ownerId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<Pet>>(_pets.Where(pet => pet.OwnerId == ownerId).ToList());
 
+    public Task<IReadOnlyList<Pet>> GetByIdsAsync(IReadOnlyCollection<Guid> petIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Pet>>(_pets.Where(pet => petIds.Contains(pet.Id)).ToList());
+
+    /// <summary>The real search is SQL and has its own integration tests: this finds pets by exact name, in order.</summary>
+    public Task<IReadOnlyList<RelevancePosition>> SearchAsync(string text, IReadOnlyCollection<Guid> excludedOwnerIds, RelevancePosition after, int take, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<RelevancePosition>>(_pets
+            .Where(pet => pet.Name == text && !excludedOwnerIds.Contains(pet.OwnerId))
+            .Select(pet => new RelevancePosition(1, pet.Id))
+            .OrderByDescending(hit => hit.Id)
+            .Where(hit => hit.Id.CompareTo(after.Id) < 0 || after.Id == Guid.Empty)
+            .Take(take)
+            .ToList());
+
     public Task<int> CountByOwnerAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(_pets.Count(pet => pet.OwnerId == ownerId));
 
     public void Add(Pet pet) => _pets.Add(pet);
@@ -304,5 +398,60 @@ internal sealed class FakeUnitOfWork : IPetsUnitOfWork
 
         Saves++;
         return Task.FromResult(1);
+    }
+}
+
+/// <summary>Who is related to whom, in the tests of a module that only knows the contract of Social.</summary>
+internal sealed class FakeRelationships : IRelationshipsApi
+{
+    private readonly HashSet<(Guid, Guid)> _friends = [];
+    private readonly HashSet<(Guid, Guid)> _blocks = [];
+
+    public void Befriend(Guid first, Guid second)
+    {
+        _friends.Add((first, second));
+        _friends.Add((second, first));
+    }
+
+    public void Block(Guid blocker, Guid blocked) => _blocks.Add((blocker, blocked));
+
+    public Task<Relationship> GetRelationshipAsync(Guid viewerId, Guid targetId, CancellationToken cancellationToken)
+    {
+        if (viewerId == targetId)
+        {
+            return Task.FromResult(Relationship.Self);
+        }
+
+        if (_blocks.Contains((viewerId, targetId)) || _blocks.Contains((targetId, viewerId)))
+        {
+            return Task.FromResult(Relationship.Blocked);
+        }
+
+        return Task.FromResult(_friends.Contains((viewerId, targetId)) ? Relationship.Friend : Relationship.None);
+    }
+
+    public Task<IReadOnlyCollection<Guid>> GetHiddenUserIdsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<Guid> hidden = _blocks
+            .Where(block => block.Item1 == userId || block.Item2 == userId)
+            .Select(block => block.Item1 == userId ? block.Item2 : block.Item1)
+            .Distinct()
+            .ToList();
+        return Task.FromResult(hidden);
+    }
+}
+
+internal sealed class FakeIdentity : IIdentityApi
+{
+    public Dictionary<Guid, UserSummary> Users { get; } = [];
+
+    public void Add(Guid id, string username) => Users[id] = new UserSummary(id, username, username, null, null);
+
+    public Task<Guid?> FindUserIdByEmailAsync(string email, CancellationToken cancellationToken) => Task.FromResult<Guid?>(null);
+
+    public Task<IReadOnlyDictionary<Guid, UserSummary>> GetPublicUsersAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<Guid, UserSummary> found = userIds.Distinct().Where(Users.ContainsKey).ToDictionary(id => id, id => Users[id]);
+        return Task.FromResult(found);
     }
 }

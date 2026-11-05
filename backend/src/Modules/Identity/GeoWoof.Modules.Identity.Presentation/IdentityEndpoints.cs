@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using GeoWoof.BuildingBlocks.Application.Messaging;
+using GeoWoof.BuildingBlocks.Application.Paging;
 using GeoWoof.BuildingBlocks.Presentation.Results;
 using GeoWoof.BuildingBlocks.Presentation.Security;
 using GeoWoof.Modules.Identity.Application;
@@ -61,6 +62,9 @@ public static class IdentityEndpoints
         api.MapGet("/users/{id:guid}", GetPublicProfileAsync).WithTags("Account")
             .Produces<ProfileDto>().ProducesProblem(StatusCodes.Status404NotFound);
 
+        api.MapGet("/search/users", SearchUsersAsync).WithTags("Search")
+            .Produces<PagedResponse<UserSummaryDto>>().ProducesValidationProblem();
+
         api.MapGet("/usernames/availability", CheckUsernameAsync).WithTags("Account")
             .Produces<UsernameAvailabilityDto>();
 
@@ -85,9 +89,19 @@ public static class IdentityEndpoints
 
     private static async Task<IResult> GetPublicProfileAsync(
         Guid id,
+        ClaimsPrincipal user,
         IQueryHandler<GetPublicProfileQuery, ProfileDto> handler,
         CancellationToken cancellationToken) =>
-        (await handler.Handle(new GetPublicProfileQuery(id), cancellationToken)).ToHttpResult(TypedResults.Ok);
+        (await handler.Handle(new GetPublicProfileQuery(user.GetUserId(), id), cancellationToken)).ToHttpResult(TypedResults.Ok);
+
+    private static async Task<IResult> SearchUsersAsync(
+        string? q,
+        int? limit,
+        string? cursor,
+        ClaimsPrincipal user,
+        IQueryHandler<SearchUsersQuery, PagedResponse<UserSummaryDto>> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new SearchUsersQuery(user.GetUserId(), q ?? string.Empty, limit, cursor), cancellationToken)).ToHttpResult(TypedResults.Ok);
 
     private static async Task<IResult> GetProvidersAsync(
         IQueryHandler<GetAuthProvidersQuery, AuthProvidersDto> handler,

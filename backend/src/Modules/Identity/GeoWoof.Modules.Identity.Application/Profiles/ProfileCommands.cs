@@ -5,6 +5,7 @@ using GeoWoof.Modules.Identity.Application.Abstractions;
 using GeoWoof.Modules.Identity.Domain;
 using GeoWoof.Modules.Identity.Domain.Users;
 using GeoWoof.Modules.Media.Contracts;
+using GeoWoof.Modules.Social.Contracts;
 
 namespace GeoWoof.Modules.Identity.Application.Profiles;
 
@@ -44,15 +45,25 @@ internal sealed class GetMyProfileQueryHandler(IUserRepository users, IMediaApi 
             : IdentityErrors.AccountNotFound;
 }
 
-/// <summary>Accounts that have not finished the onboarding have no public profile yet.</summary>
-public sealed record GetPublicProfileQuery(Guid UserId) : IQuery<ProfileDto>;
+/// <summary>
+/// Accounts that have not finished the onboarding have no public profile yet. With a block in
+/// either direction, the answer is the same as for an account that does not exist.
+/// </summary>
+public sealed record GetPublicProfileQuery(Guid ViewerId, Guid UserId) : IQuery<ProfileDto>;
 
-internal sealed class GetPublicProfileQueryHandler(IUserRepository users, IMediaApi media) : IQueryHandler<GetPublicProfileQuery, ProfileDto>
+internal sealed class GetPublicProfileQueryHandler(IUserRepository users, IRelationshipsApi relationships, IMediaApi media) : IQueryHandler<GetPublicProfileQuery, ProfileDto>
 {
-    public async Task<Result<ProfileDto>> Handle(GetPublicProfileQuery query, CancellationToken cancellationToken) =>
-        await users.GetByIdAsync(query.UserId, cancellationToken) is { HasCompletedOnboarding: true } user
+    public async Task<Result<ProfileDto>> Handle(GetPublicProfileQuery query, CancellationToken cancellationToken)
+    {
+        if (await relationships.GetRelationshipAsync(query.ViewerId, query.UserId, cancellationToken) == Relationship.Blocked)
+        {
+            return IdentityErrors.UserNotFound;
+        }
+
+        return await users.GetByIdAsync(query.UserId, cancellationToken) is { HasCompletedOnboarding: true } user
             ? await ProfileMapper.ToDtoAsync(user, media, cancellationToken)
             : IdentityErrors.UserNotFound;
+    }
 }
 
 /// <summary>Replaces the profile: a <c>null</c> field is cleared.</summary>

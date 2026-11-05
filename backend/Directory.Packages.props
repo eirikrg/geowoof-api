@@ -41,6 +41,8 @@
   </ItemGroup>
   <ItemGroup Label="Infrastructure integrations">
     <PackageVersion Include="StackExchange.Redis" Version="3.4.31" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.14" />
     <PackageVersion Include="SkiaSharp" Version="4.154.0" />
     <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.154.0" />
     <PackageVersion Include="AWSSDK.S3" Version="4.0.104.8" />

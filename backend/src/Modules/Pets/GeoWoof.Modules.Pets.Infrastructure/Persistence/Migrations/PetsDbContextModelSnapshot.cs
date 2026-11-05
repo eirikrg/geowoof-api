@@ -21,7 +21,9 @@ namespace GeoWoof.Modules.Pets.Infrastructure.Persistence.Migrations
                 .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "postgis");
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "unaccent");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("GeoWoof.BuildingBlocks.Infrastructure.Inbox.InboxMessage", b =>

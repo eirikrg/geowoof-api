@@ -1,7 +1,9 @@
 using GeoWoof.BuildingBlocks.Application.Persistence;
+using GeoWoof.BuildingBlocks.Domain.Visibility;
 using GeoWoof.Modules.Identity.Contracts;
 using GeoWoof.Modules.Media.Contracts;
 using GeoWoof.Modules.Pets.Contracts;
+using GeoWoof.Modules.Social.Contracts;
 using GeoWoof.Modules.Walks.Application;
 using GeoWoof.Modules.Walks.Application.Abstractions;
 using GeoWoof.Modules.Walks.Application.Events;
@@ -28,6 +30,8 @@ public sealed class WalkHandlerTests
     private readonly FakePets _pets = new();
     private readonly FakeMedia _media = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
+    private readonly FakeRelationships _relationships = new();
+    private readonly FakeIdentity _identity = new();
 
     public WalkHandlerTests()
     {
@@ -56,6 +60,104 @@ public sealed class WalkHandlerTests
 
     private Task<BuildingBlocks.Domain.Results.Result<PutWalkResult>> PutAsync(Guid id, WalkInput input, Guid? owner = null) =>
         Put().Handle(new PutWalkCommand(owner ?? Ana, id, input), Token);
+
+    private Task<BuildingBlocks.Domain.Results.Result<WalkDto>> GetAsync(Guid viewer, Guid id) =>
+        new GetWalkQueryHandler(_walks, _relationships, _media).Handle(new GetWalkQuery(viewer, id), Token);
+
+    private Task<BuildingBlocks.Domain.Results.Result<BuildingBlocks.Application.Paging.PagedResponse<WalkSummaryDto>>> GetOfUserAsync(Guid viewer, Guid user) =>
+        new GetUserWalksQueryHandler(_walks, _identity, _relationships, _media).Handle(new GetUserWalksQuery(viewer, user, null, null), Token);
+
+    /// <summary>Goes north for about 1 km, so that it has something outside the hidden zones.</summary>
+    private async Task<Guid> SaveLongWalkAsync(string visibility)
+    {
+        var id = Guid.CreateVersion7();
+        var input = Input() with { Visibility = visibility, Segments = [ToDto(WalkTestData.North(91, stepMs: 4000))] };
+        (await PutAsync(id, input)).IsSuccess.ShouldBeTrue();
+        return id;
+    }
+
+    [Theory]
+    [InlineData("Everyone", true, true)]
+    [InlineData("Friends", true, false)]
+    [InlineData("OnlyMe", false, false)]
+    public async Task A_walk_is_seen_according_to_its_visibility(string visibility, bool friendSees, bool strangerSees)
+    {
+        var id = await SaveLongWalkAsync(visibility);
+        var carlos = Guid.CreateVersion7();
+        _relationships.Befriend(Ana, Bea);
+
+        (await GetAsync(Ana, id)).IsSuccess.ShouldBeTrue();
+        (await GetAsync(Bea, id)).IsSuccess.ShouldBe(friendSees);
+        (await GetAsync(carlos, id)).IsSuccess.ShouldBe(strangerSees);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_block_in_either_direction_hides_a_walk_even_from_a_friend(bool anaBlocks)
+    {
+        var id = await SaveLongWalkAsync("Everyone");
+        _identity.Add(Ana, "ana");
+        _relationships.Befriend(Ana, Bea);
+        _relationships.Block(anaBlocks ? Ana : Bea, anaBlocks ? Bea : Ana);
+
+        (await GetAsync(Bea, id)).Error.ShouldBe(WalksErrors.NotFound);
+        (await GetOfUserAsync(Bea, Ana)).Error.ShouldBe(WalksErrors.UserNotFound);
+    }
+
+    [Fact]
+    public async Task Only_the_owner_gets_the_whole_route()
+    {
+        var id = await SaveLongWalkAsync("Everyone");
+        var whole = (await GetAsync(Ana, id)).Value;
+
+        var other = (await GetAsync(Bea, id)).Value;
+
+        whole.Segments.Single().TimeOffsetsMs.Count.ShouldBe(91);
+        other.Segments.Single().TimeOffsetsMs.Count.ShouldBeLessThan(91);
+        other.Segments.Single().TimeOffsetsMs[0].ShouldBeGreaterThan(0);
+        other.PreviewPolylines.ShouldNotBe(whole.PreviewPolylines);
+        other.DistanceM.ShouldBe(whole.DistanceM);
+    }
+
+    [Fact]
+    public async Task The_list_of_a_person_shows_what_each_viewer_can_see_with_the_route_cut()
+    {
+        _identity.Add(Ana, "ana");
+        await SaveLongWalkAsync("Everyone");
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await SaveLongWalkAsync("Friends");
+        _time.Advance(TimeSpan.FromMinutes(1));
+        await SaveLongWalkAsync("OnlyMe");
+        var carlos = Guid.CreateVersion7();
+        _relationships.Befriend(Ana, Bea);
+
+        var mine = (await GetOfUserAsync(Ana, Ana)).Value.Items;
+        var friend = (await GetOfUserAsync(Bea, Ana)).Value.Items;
+        var stranger = (await GetOfUserAsync(carlos, Ana)).Value.Items;
+
+        mine.Count.ShouldBe(3);
+        friend.Count.ShouldBe(2);
+        friend.ShouldAllBe(walk => walk.Visibility != "OnlyMe");
+        stranger.Single().Visibility.ShouldBe("Everyone");
+        stranger.Single().PreviewPolylines.ShouldNotBe(mine[0].PreviewPolylines);
+    }
+
+    [Fact]
+    public async Task The_list_of_someone_who_does_not_exist_is_not_found()
+    {
+        (await GetOfUserAsync(Bea, Guid.CreateVersion7())).Error.ShouldBe(WalksErrors.UserNotFound);
+    }
+
+    [Fact]
+    public async Task A_bad_cursor_in_the_list_of_a_person_is_rejected()
+    {
+        _identity.Add(Ana, "ana");
+
+        var result = await new GetUserWalksQueryHandler(_walks, _identity, _relationships, _media).Handle(new GetUserWalksQuery(Bea, Ana, null, "!!"), Token);
+
+        result.Error.ShouldBe(WalksErrors.InvalidCursor);
+    }
 
     [Fact]
     public void Migrations_are_in_sync_with_the_model()
@@ -138,7 +240,7 @@ public sealed class WalkHandlerTests
         await PutAsync(id, Input());
 
         (await PutAsync(id, Input() with { PetIds = [Mishi] }, Bea)).Error.ShouldBe(WalksErrors.NotFound);
-        (await new GetWalkQueryHandler(_walks, _media).Handle(new GetWalkQuery(Bea, id), Token)).Error.ShouldBe(WalksErrors.NotFound);
+        (await new GetWalkQueryHandler(_walks, _relationships, _media).Handle(new GetWalkQuery(Bea, id), Token)).Error.ShouldBe(WalksErrors.NotFound);
         (await new DeleteWalkCommandHandler(_walks, _media, _unitOfWork).Handle(new DeleteWalkCommand(Bea, id), Token)).Error.ShouldBe(WalksErrors.NotFound);
         _walks.All.ShouldHaveSingleItem();
     }
@@ -416,8 +518,12 @@ internal sealed class InMemoryWalks : IWalkRepository
 
     public Task<Walk?> GetByIdAsync(Guid walkId, CancellationToken cancellationToken) => Task.FromResult(_walks.Find(walk => walk.Id == walkId));
 
-    public Task<IReadOnlyList<WalkSummaryRow>> GetPageAsync(Guid ownerId, Guid? petId, WalkPageCursor? after, int take, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyDictionary<Guid, IReadOnlyList<WalkSegment>>> GetTracksAsync(IReadOnlyCollection<Guid> walkIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, IReadOnlyList<WalkSegment>>>(_walks.Where(walk => walkIds.Contains(walk.Id)).ToDictionary(walk => walk.Id, walk => walk.Segments));
+
+    public Task<IReadOnlyList<WalkSummaryRow>> GetPageAsync(Guid ownerId, Guid? petId, IReadOnlyCollection<ContentVisibility>? visibilities, WalkPageCursor? after, int take, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<WalkSummaryRow>>(Of(ownerId, petId)
+            .Where(walk => visibilities is null || visibilities.Contains(walk.Visibility))
             .OrderByDescending(walk => walk.StartedAt)
             .ThenByDescending(walk => walk.Id)
             .Where(walk => after is null || walk.StartedAt < after.StartedAt || (walk.StartedAt == after.StartedAt && walk.Id.CompareTo(after.Id) < 0))
@@ -523,4 +629,59 @@ internal sealed class FakeUnitOfWork : IWalksUnitOfWork
     }
 
     public void DiscardChanges() => Discards++;
+}
+
+/// <summary>Who is related to whom, in the tests of a module that only knows the contract of Social.</summary>
+internal sealed class FakeRelationships : IRelationshipsApi
+{
+    private readonly HashSet<(Guid, Guid)> _friends = [];
+    private readonly HashSet<(Guid, Guid)> _blocks = [];
+
+    public void Befriend(Guid first, Guid second)
+    {
+        _friends.Add((first, second));
+        _friends.Add((second, first));
+    }
+
+    public void Block(Guid blocker, Guid blocked) => _blocks.Add((blocker, blocked));
+
+    public Task<Relationship> GetRelationshipAsync(Guid viewerId, Guid targetId, CancellationToken cancellationToken)
+    {
+        if (viewerId == targetId)
+        {
+            return Task.FromResult(Relationship.Self);
+        }
+
+        if (_blocks.Contains((viewerId, targetId)) || _blocks.Contains((targetId, viewerId)))
+        {
+            return Task.FromResult(Relationship.Blocked);
+        }
+
+        return Task.FromResult(_friends.Contains((viewerId, targetId)) ? Relationship.Friend : Relationship.None);
+    }
+
+    public Task<IReadOnlyCollection<Guid>> GetHiddenUserIdsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<Guid> hidden = _blocks
+            .Where(block => block.Item1 == userId || block.Item2 == userId)
+            .Select(block => block.Item1 == userId ? block.Item2 : block.Item1)
+            .Distinct()
+            .ToList();
+        return Task.FromResult(hidden);
+    }
+}
+
+internal sealed class FakeIdentity : IIdentityApi
+{
+    public Dictionary<Guid, UserSummary> Users { get; } = [];
+
+    public void Add(Guid id, string username) => Users[id] = new UserSummary(id, username, username, null, null);
+
+    public Task<Guid?> FindUserIdByEmailAsync(string email, CancellationToken cancellationToken) => Task.FromResult<Guid?>(null);
+
+    public Task<IReadOnlyDictionary<Guid, UserSummary>> GetPublicUsersAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<Guid, UserSummary> found = userIds.Distinct().Where(Users.ContainsKey).ToDictionary(id => id, id => Users[id]);
+        return Task.FromResult(found);
+    }
 }

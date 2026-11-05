@@ -1,3 +1,4 @@
+using GeoWoof.BuildingBlocks.Application.Paging;
 using GeoWoof.Modules.Identity.Application.Profiles;
 using GeoWoof.Modules.Identity.Domain;
 using GeoWoof.Modules.Media.Contracts;
@@ -76,14 +77,75 @@ public sealed class ProfileTests
         var finished = host.AddUser("ana@example.com", username: "ana");
         var onboarding = host.AddUser("bea@example.com");
 
-        var visible = await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(finished.Id));
-        var hidden = await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(onboarding.Id));
-        var missing = await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(Guid.CreateVersion7()));
+        var viewer = host.AddUser("carlos@example.com", username: "carlos").Id;
+        var visible = await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(viewer, finished.Id));
+        var hidden = await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(viewer, onboarding.Id));
+        var missing = await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(viewer, Guid.CreateVersion7()));
         var own = await host.QueryAsync<GetMyProfileQuery, ProfileDto>(new GetMyProfileQuery(onboarding.Id));
 
         visible.Value.Username.ShouldBe("ana");
         hidden.Error.ShouldBe(IdentityErrors.UserNotFound);
         missing.Error.ShouldBe(IdentityErrors.UserNotFound);
         own.Value.Username.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_block_in_either_direction_hides_the_profile(bool viewerBlocks)
+    {
+        await using var host = new IdentityTestHost();
+        var ana = host.AddUser("ana@example.com", username: "ana");
+        var bea = host.AddUser("bea@example.com", username: "bea");
+        host.Relationships.Block(viewerBlocks ? bea.Id : ana.Id, viewerBlocks ? ana.Id : bea.Id);
+
+        var result = await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(bea.Id, ana.Id));
+
+        result.Error.ShouldBe(IdentityErrors.UserNotFound);
+    }
+
+    [Fact]
+    public async Task The_search_leaves_out_the_viewer_and_the_blocked_in_both_directions()
+    {
+        await using var host = new IdentityTestHost();
+        var viewer = host.AddUser("ana@example.com", username: "ana");
+        var visible = host.AddUser("visible@example.com", username: "visible");
+        var blockedByViewer = host.AddUser("b1@example.com", username: "blocked_one");
+        var blockedViewer = host.AddUser("b2@example.com", username: "blocked_two");
+        host.Relationships.Block(viewer.Id, blockedByViewer.Id);
+        host.Relationships.Block(blockedViewer.Id, viewer.Id);
+
+        var result = await host.QueryAsync<SearchUsersQuery, PagedResponse<UserSummaryDto>>(new SearchUsersQuery(viewer.Id, "  Ana  ", null, null));
+
+        result.Value.Items.Single().Id.ShouldBe(visible.Id);
+        result.Value.NextCursor.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task The_search_goes_through_pages()
+    {
+        await using var host = new IdentityTestHost();
+        var viewer = host.AddUser("viewer@example.com", username: "viewer");
+        host.AddUser("a@example.com", username: "first");
+        host.AddUser("b@example.com", username: "second");
+
+        var first = await host.QueryAsync<SearchUsersQuery, PagedResponse<UserSummaryDto>>(new SearchUsersQuery(viewer.Id, "Ana", 1, null));
+        var second = await host.QueryAsync<SearchUsersQuery, PagedResponse<UserSummaryDto>>(new SearchUsersQuery(viewer.Id, "Ana", 1, first.Value.NextCursor));
+
+        first.Value.NextCursor.ShouldNotBeNull();
+        second.Value.NextCursor.ShouldBeNull();
+        second.Value.Items.Single().Id.ShouldNotBe(first.Value.Items.Single().Id);
+    }
+
+    [Fact]
+    public async Task The_search_rejects_a_bad_cursor_and_a_text_too_short_or_too_long()
+    {
+        await using var host = new IdentityTestHost();
+        var viewer = host.AddUser("viewer@example.com", username: "viewer");
+
+        (await host.QueryAsync<SearchUsersQuery, PagedResponse<UserSummaryDto>>(new SearchUsersQuery(viewer.Id, "ana", null, "!!"))).Error.ShouldBe(IdentityErrors.InvalidCursor);
+        new SearchUsersQueryValidator().Validate(new SearchUsersQuery(viewer.Id, " a ", null, null)).IsValid.ShouldBeFalse();
+        new SearchUsersQueryValidator().Validate(new SearchUsersQuery(viewer.Id, new string('a', 51), null, null)).IsValid.ShouldBeFalse();
+        new SearchUsersQueryValidator().Validate(new SearchUsersQuery(viewer.Id, "an", null, null)).IsValid.ShouldBeTrue();
     }
 }

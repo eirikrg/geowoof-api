@@ -2,24 +2,85 @@ using System.Globalization;
 using GeoWoof.BuildingBlocks.Application.Messaging;
 using GeoWoof.BuildingBlocks.Application.Paging;
 using GeoWoof.BuildingBlocks.Domain.Results;
+using GeoWoof.BuildingBlocks.Domain.Visibility;
+using GeoWoof.Modules.Identity.Contracts;
 using GeoWoof.Modules.Media.Contracts;
 using GeoWoof.Modules.Pets.Contracts;
+using GeoWoof.Modules.Social.Contracts;
 using GeoWoof.Modules.Walks.Application.Abstractions;
 using GeoWoof.Modules.Walks.Domain;
 
 namespace GeoWoof.Modules.Walks.Application.Walks;
 
-/// <summary>In this phase only the owner can see a walk: for anyone else, it does not exist (docs/api.md).</summary>
+internal static class ViewerRelations
+{
+    public static ViewerRelation ToViewerRelation(this Relationship relationship) => relationship switch
+    {
+        Relationship.Self => ViewerRelation.Owner,
+        Relationship.Friend => ViewerRelation.Friend,
+        Relationship.None => ViewerRelation.Stranger,
+        _ => ViewerRelation.Blocked,
+    };
+}
+
+/// <summary>For whoever cannot see it, the walk does not exist (docs/api.md).</summary>
 public sealed record GetWalkQuery(Guid ViewerId, Guid WalkId) : IQuery<WalkDto>;
 
-internal sealed class GetWalkQueryHandler(IWalkRepository walks, IMediaApi media) : IQueryHandler<GetWalkQuery, WalkDto>
+internal sealed class GetWalkQueryHandler(IWalkRepository walks, IRelationshipsApi relationships, IMediaApi media) : IQueryHandler<GetWalkQuery, WalkDto>
 {
     public async Task<Result<WalkDto>> Handle(GetWalkQuery query, CancellationToken cancellationToken)
     {
         var walk = await walks.GetByIdAsync(query.WalkId, cancellationToken);
-        return walk is null || walk.OwnerId != query.ViewerId
-            ? WalksErrors.NotFound
-            : await WalkMapper.ToDtoAsync(walk, media, cancellationToken);
+        if (walk is null)
+        {
+            return WalksErrors.NotFound;
+        }
+
+        var relationship = await relationships.GetRelationshipAsync(query.ViewerId, walk.OwnerId, cancellationToken);
+        return walk.IsVisibleTo(relationship.ToViewerRelation())
+            ? await WalkMapper.ToDtoAsync(walk, query.ViewerId, media, cancellationToken)
+            : WalksErrors.NotFound;
+    }
+}
+
+/// <summary>The walks of a person that the viewer can see, without the zones that reveal where they live.</summary>
+public sealed record GetUserWalksQuery(Guid ViewerId, Guid UserId, int? Limit, string? Cursor) : IQuery<PagedResponse<WalkSummaryDto>>;
+
+internal sealed class GetUserWalksQueryHandler(IWalkRepository walks, IIdentityApi identity, IRelationshipsApi relationships, IMediaApi media)
+    : IQueryHandler<GetUserWalksQuery, PagedResponse<WalkSummaryDto>>
+{
+    public async Task<Result<PagedResponse<WalkSummaryDto>>> Handle(GetUserWalksQuery query, CancellationToken cancellationToken)
+    {
+        var viewer = (await relationships.GetRelationshipAsync(query.ViewerId, query.UserId, cancellationToken)).ToViewerRelation();
+        var users = await identity.GetPublicUsersAsync([query.UserId], cancellationToken);
+        if (viewer == ViewerRelation.Blocked || !users.ContainsKey(query.UserId))
+        {
+            return WalksErrors.UserNotFound;
+        }
+
+        WalkPageCursor? after = null;
+        if (query.Cursor is { } cursor)
+        {
+            after = WalkCursor.Decode(cursor);
+            if (after is null)
+            {
+                return WalksErrors.InvalidCursor;
+            }
+        }
+
+        var limit = PageLimit.Normalize(query.Limit);
+        var rows = await walks.GetPageAsync(query.UserId, null, VisibilityRules.VisibleTo(viewer), after, limit + 1, cancellationToken);
+        var page = rows.Take(limit).ToList();
+        var next = rows.Count > limit ? WalkCursor.Encode(page[^1]) : null;
+
+        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? previews = null;
+        if (viewer != ViewerRelation.Owner)
+        {
+            var tracks = await walks.GetTracksAsync(page.Select(row => row.Id).ToList(), cancellationToken);
+            previews = tracks.ToDictionary(track => track.Key, track => RoutePrivacy.Hide(track.Value).Previews);
+        }
+
+        return new PagedResponse<WalkSummaryDto>(await WalkMapper.ToSummariesAsync(page, previews, media, cancellationToken), next);
     }
 }
 
@@ -74,10 +135,10 @@ internal sealed class GetWalksQueryHandler(IWalkRepository walks, IPetsApi pets,
         }
 
         var limit = PageLimit.Normalize(query.Limit);
-        var rows = await walks.GetPageAsync(query.ViewerId, query.PetId, after, limit + 1, cancellationToken);
+        var rows = await walks.GetPageAsync(query.ViewerId, query.PetId, null, after, limit + 1, cancellationToken);
         var page = rows.Take(limit).ToList();
         var next = rows.Count > limit ? WalkCursor.Encode(page[^1]) : null;
-        return new PagedResponse<WalkSummaryDto>(await WalkMapper.ToSummariesAsync(page, media, cancellationToken), next);
+        return new PagedResponse<WalkSummaryDto>(await WalkMapper.ToSummariesAsync(page, null, media, cancellationToken), next);
     }
 }
 

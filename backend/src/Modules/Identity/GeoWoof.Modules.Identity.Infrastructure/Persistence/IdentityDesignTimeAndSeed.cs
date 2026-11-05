@@ -35,6 +35,7 @@ internal sealed class IdentityDevelopmentSeeder(IdentityDbContext dbContext, IPa
         ("ana@geowoof.dev", "ana", "Ana", Language.Es),
         ("bea@geowoof.dev", "bea", "Bea", Language.Es),
         ("carlos@geowoof.dev", "carlos", "Carlos", Language.En),
+        ("jose@geowoof.dev", "jose_angel", "José Ángel", Language.Es),
     ];
 
     public int Order => 0;

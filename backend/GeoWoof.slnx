@@ -38,6 +38,13 @@
     <Project Path="src/Modules/Walks/GeoWoof.Modules.Walks.Infrastructure/GeoWoof.Modules.Walks.Infrastructure.csproj" />
     <Project Path="src/Modules/Walks/GeoWoof.Modules.Walks.Presentation/GeoWoof.Modules.Walks.Presentation.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Social/">
+    <Project Path="src/Modules/Social/GeoWoof.Modules.Social.Application/GeoWoof.Modules.Social.Application.csproj" />
+    <Project Path="src/Modules/Social/GeoWoof.Modules.Social.Contracts/GeoWoof.Modules.Social.Contracts.csproj" />
+    <Project Path="src/Modules/Social/GeoWoof.Modules.Social.Domain/GeoWoof.Modules.Social.Domain.csproj" />
+    <Project Path="src/Modules/Social/GeoWoof.Modules.Social.Infrastructure/GeoWoof.Modules.Social.Infrastructure.csproj" />
+    <Project Path="src/Modules/Social/GeoWoof.Modules.Social.Presentation/GeoWoof.Modules.Social.Presentation.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/GeoWoof.ArchitectureTests/GeoWoof.ArchitectureTests.csproj" />
     <Project Path="tests/GeoWoof.BuildingBlocks.UnitTests/GeoWoof.BuildingBlocks.UnitTests.csproj" />
@@ -48,5 +55,6 @@
     <Project Path="tests/Modules/GeoWoof.Modules.Media.UnitTests/GeoWoof.Modules.Media.UnitTests.csproj" />
     <Project Path="tests/Modules/GeoWoof.Modules.Pets.UnitTests/GeoWoof.Modules.Pets.UnitTests.csproj" />
     <Project Path="tests/Modules/GeoWoof.Modules.Walks.UnitTests/GeoWoof.Modules.Walks.UnitTests.csproj" />
+    <Project Path="tests/Modules/GeoWoof.Modules.Social.UnitTests/GeoWoof.Modules.Social.UnitTests.csproj" />
   </Folder>
 </Solution>

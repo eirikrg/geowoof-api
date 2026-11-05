@@ -13,7 +13,7 @@ public sealed class WalkTrack
 {
     public const int MaxPoints = 20_000;
 
-    private const double PreviewToleranceM = 5;
+    internal const double PreviewToleranceM = 5;
 
     private WalkTrack(IReadOnlyList<WalkSegment> segments, IReadOnlyList<IReadOnlyList<TrackPoint>> points)
     {

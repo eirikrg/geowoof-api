@@ -2,6 +2,7 @@ using FluentValidation;
 using GeoWoof.BuildingBlocks.Application.Messaging;
 using GeoWoof.BuildingBlocks.Application.Persistence;
 using GeoWoof.BuildingBlocks.Domain.Results;
+using GeoWoof.BuildingBlocks.Domain.Visibility;
 using GeoWoof.Modules.Media.Contracts;
 using GeoWoof.Modules.Pets.Contracts;
 using GeoWoof.Modules.Walks.Application.Abstractions;
@@ -46,8 +47,8 @@ internal sealed class WalkInputValidator : AbstractValidator<WalkInput>
             .Must(zone => zone is not null && TimeZoneInfo.TryFindSystemTimeZoneById(zone, out _))
             .WithMessage("Use a valid IANA time zone, such as Europe/Madrid.");
         RuleFor(input => input.Visibility)
-            .Must(visibility => Enum.GetNames<WalkVisibility>().Contains(visibility, StringComparer.Ordinal))
-            .WithMessage($"Use one of: {string.Join(", ", Enum.GetNames<WalkVisibility>())}.");
+            .Must(visibility => Enum.GetNames<ContentVisibility>().Contains(visibility, StringComparer.Ordinal))
+            .WithMessage($"Use one of: {string.Join(", ", Enum.GetNames<ContentVisibility>())}.");
         RuleFor(input => input.Note).MaximumLength(Walk.NoteMaxLength);
         RuleFor(input => input.PetIds)
             .Must(pets => pets is { Count: > 0 and <= Walk.MaxPets } && pets.Distinct().Count() == pets.Count)
@@ -133,12 +134,12 @@ internal sealed partial class PutWalkCommandHandler(
             return attached.Error;
         }
 
-        var details = new WalkDetails(Enum.Parse<WalkVisibility>(input.Visibility), input.Note, photos);
+        var details = new WalkDetails(Enum.Parse<ContentVisibility>(input.Visibility), input.Note, photos);
         var walk = Walk.Record(walkId, ownerId, input.StartedAt, input.EndedAt, input.TimeZone, input.PetIds, details, track.Value, input.UpdatedAt, now);
         LogIfSuspicious(walk, input.ClientStats);
         walks.Add(walk, track.Value);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return new PutWalkResult(await WalkMapper.ToDtoAsync(walk, media, cancellationToken), Created: true);
+        return new PutWalkResult(await WalkMapper.ToDtoAsync(walk, ownerId, media, cancellationToken), Created: true);
     }
 
     private async Task<Result<PutWalkResult>> UpdateAsync(Walk walk, Guid ownerId, WalkInput input, CancellationToken cancellationToken)
@@ -155,7 +156,7 @@ internal sealed partial class PutWalkCommandHandler(
 
         if (walk.IsStale(input.UpdatedAt))
         {
-            return new PutWalkResult(await WalkMapper.ToDtoAsync(walk, media, cancellationToken), Created: false);
+            return new PutWalkResult(await WalkMapper.ToDtoAsync(walk, ownerId, media, cancellationToken), Created: false);
         }
 
         var photos = input.PhotoAssetIds ?? [];
@@ -166,7 +167,7 @@ internal sealed partial class PutWalkCommandHandler(
             return attached.Error;
         }
 
-        walk.Update(new WalkDetails(Enum.Parse<WalkVisibility>(input.Visibility), input.Note, photos), input.UpdatedAt);
+        walk.Update(new WalkDetails(Enum.Parse<ContentVisibility>(input.Visibility), input.Note, photos), input.UpdatedAt);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         foreach (var removed in previous.Except(photos))
@@ -174,7 +175,7 @@ internal sealed partial class PutWalkCommandHandler(
             await media.ReleaseAsync(removed, ownerId, cancellationToken);
         }
 
-        return new PutWalkResult(await WalkMapper.ToDtoAsync(walk, media, cancellationToken), Created: false);
+        return new PutWalkResult(await WalkMapper.ToDtoAsync(walk, ownerId, media, cancellationToken), Created: false);
     }
 
     private async Task<bool> IsSameWalkAsync(Walk walk, WalkInput input, CancellationToken cancellationToken)

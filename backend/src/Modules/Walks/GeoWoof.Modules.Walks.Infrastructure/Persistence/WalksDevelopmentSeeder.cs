@@ -1,3 +1,4 @@
+using GeoWoof.BuildingBlocks.Domain.Visibility;
 using GeoWoof.BuildingBlocks.Infrastructure.Persistence;
 using GeoWoof.Modules.Identity.Contracts;
 using GeoWoof.Modules.Pets.Contracts;
@@ -39,7 +40,10 @@ internal sealed class WalksDevelopmentSeeder(WalksDbContext dbContext, IWalkRepo
         ("ana@geowoof.dev", Retiro, 6, "Vuelta al Retiro"),
         ("bea@geowoof.dev", Retiro, 3, null),
         ("carlos@geowoof.dev", ParqueDelOeste, 4, "Parque del Oeste con Rocky"),
+        ("jose@geowoof.dev", ParqueDelOeste, 3, null),
     ];
+
+    private static readonly ContentVisibility[] SampleVisibilities = [ContentVisibility.Everyone, ContentVisibility.Friends, ContentVisibility.OnlyMe];
 
     public int Order => 20;
 
@@ -74,7 +78,7 @@ internal sealed class WalksDevelopmentSeeder(WalksDbContext dbContext, IWalkRepo
             var (segments, duration) = BuildSegments(route, random, minutes: 15 + random.Next(0, 25), withPause: i % 2 == 1);
             var track = WalkTrack.Parse(segments, duration).Value;
             var petsOfWalk = petIds.Take(1 + (i % petIds.Count)).ToList();
-            var details = new WalkDetails(WalkVisibility.Friends, i == 0 ? note : null, []);
+            var details = new WalkDetails(SampleVisibilities[i % SampleVisibilities.Length], i == 0 ? note : null, []);
             var endedAt = startedAt + duration;
             walks.Add(Walk.Record(Guid.CreateVersion7(startedAt), ownerId, startedAt, endedAt, TimeZone, petsOfWalk, details, track, endedAt, now), track);
         }

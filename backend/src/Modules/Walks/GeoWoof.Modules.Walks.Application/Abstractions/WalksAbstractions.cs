@@ -1,3 +1,4 @@
+using GeoWoof.BuildingBlocks.Domain.Visibility;
 using GeoWoof.Modules.Walks.Domain;
 
 namespace GeoWoof.Modules.Walks.Application.Abstractions;
@@ -12,7 +13,7 @@ public sealed record WalkSummaryRow(
     DateTimeOffset EndedAt,
     string TimeZone,
     IReadOnlyList<Guid> PetIds,
-    WalkVisibility Visibility,
+    ContentVisibility Visibility,
     string? Note,
     int DistanceM,
     int DurationS,
@@ -32,7 +33,11 @@ public interface IWalkRepository
 {
     Task<Walk?> GetByIdAsync(Guid walkId, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<WalkSummaryRow>> GetPageAsync(Guid ownerId, Guid? petId, WalkPageCursor? after, int take, CancellationToken cancellationToken);
+    /// <summary>Only with the given visibilities; <c>null</c> for all of them.</summary>
+    Task<IReadOnlyList<WalkSummaryRow>> GetPageAsync(Guid ownerId, Guid? petId, IReadOnlyCollection<ContentVisibility>? visibilities, WalkPageCursor? after, int take, CancellationToken cancellationToken);
+
+    /// <summary>The routes of those walks, which lists do not load unless the route has to be cut for someone else.</summary>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<WalkSegment>>> GetTracksAsync(IReadOnlyCollection<Guid> walkIds, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<WalkStatsRow>> GetStatsRowsAsync(Guid ownerId, Guid? petId, CancellationToken cancellationToken);
 

@@ -18,6 +18,9 @@ public static class RateLimitPolicies
 
     /// <summary>Session refresh, per IP address.</summary>
     public const string TokenRefresh = "auth-refresh";
+
+    /// <summary>What reaches another person (friend requests, reports), per user.</summary>
+    public const string SocialWrites = "social-writes";
 }
 
 public static class ClaimsPrincipalExtensions

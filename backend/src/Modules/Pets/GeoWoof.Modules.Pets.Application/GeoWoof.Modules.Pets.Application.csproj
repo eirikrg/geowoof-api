@@ -3,6 +3,7 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\GeoWoof.BuildingBlocks.Application\GeoWoof.BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\GeoWoof.Modules.Pets.Domain\GeoWoof.Modules.Pets.Domain.csproj" />
     <ProjectReference Include="..\GeoWoof.Modules.Pets.Contracts\GeoWoof.Modules.Pets.Contracts.csproj" />
+    <ProjectReference Include="..\..\Social\GeoWoof.Modules.Social.Contracts\GeoWoof.Modules.Social.Contracts.csproj" />
     <ProjectReference Include="..\..\Identity\GeoWoof.Modules.Identity.Contracts\GeoWoof.Modules.Identity.Contracts.csproj" />
     <ProjectReference Include="..\..\Media\GeoWoof.Modules.Media.Contracts\GeoWoof.Modules.Media.Contracts.csproj" />
   </ItemGroup>
