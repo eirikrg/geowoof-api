@@ -8,6 +8,8 @@ using GeoWoof.Modules.Media.Infrastructure;
 using GeoWoof.Modules.Media.Presentation;
 using GeoWoof.Modules.Pets.Infrastructure;
 using GeoWoof.Modules.Pets.Presentation;
+using GeoWoof.Modules.Walks.Infrastructure;
+using GeoWoof.Modules.Walks.Presentation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +21,7 @@ builder.Services.AddGeoWoofInfrastructure(builder.Environment);
 builder.Services.AddIdentityModule();
 builder.Services.AddMediaModule();
 builder.Services.AddPetsModule();
+builder.Services.AddWalksModule();
 builder.Services.DecorateApplicationHandlers();
 
 var app = builder.Build();
@@ -32,6 +35,7 @@ var api = app.MapGroup("/api/v1");
 api.MapIdentityEndpoints();
 api.MapMediaEndpoints();
 api.MapPetsEndpoints();
+api.MapWalksEndpoints();
 
 await app.InitializeDatabasesAsync();
 await app.RunAsync();

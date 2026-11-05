@@ -18,6 +18,11 @@
     <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Infrastructure\GeoWoof.Modules.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Presentation\GeoWoof.Modules.Identity.Presentation.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\GeoWoof.Modules.Identity.Contracts\GeoWoof.Modules.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Walks\GeoWoof.Modules.Walks.Domain\GeoWoof.Modules.Walks.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Walks\GeoWoof.Modules.Walks.Application\GeoWoof.Modules.Walks.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Walks\GeoWoof.Modules.Walks.Infrastructure\GeoWoof.Modules.Walks.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Walks\GeoWoof.Modules.Walks.Presentation\GeoWoof.Modules.Walks.Presentation.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Walks\GeoWoof.Modules.Walks.Contracts\GeoWoof.Modules.Walks.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Domain\GeoWoof.Modules.Media.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Application\GeoWoof.Modules.Media.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Infrastructure\GeoWoof.Modules.Media.Infrastructure.csproj" />

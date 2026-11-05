@@ -12,6 +12,8 @@
     <ProjectReference Include="..\Modules\Media\GeoWoof.Modules.Media.Presentation\GeoWoof.Modules.Media.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Pets\GeoWoof.Modules.Pets.Infrastructure\GeoWoof.Modules.Pets.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Pets\GeoWoof.Modules.Pets.Presentation\GeoWoof.Modules.Pets.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Walks\GeoWoof.Modules.Walks.Infrastructure\GeoWoof.Modules.Walks.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Walks\GeoWoof.Modules.Walks.Presentation\GeoWoof.Modules.Walks.Presentation.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />

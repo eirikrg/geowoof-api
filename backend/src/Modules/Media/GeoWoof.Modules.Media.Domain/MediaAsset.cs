@@ -7,6 +7,7 @@ public enum MediaPurpose
 {
     UserAvatar = 0,
     PetAvatar = 1,
+    WalkPhoto = 2,
 }
 
 public enum MediaAssetStatus
