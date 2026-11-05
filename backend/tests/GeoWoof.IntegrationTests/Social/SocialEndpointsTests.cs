@@ -240,7 +240,7 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
             response.Dispose();
         }
 
-        (await RelationshipAsync(ana, bea)).ShouldBeOneOf("Friends");
+        (await RelationshipAsync(ana, bea)).ShouldBe("Friends");
         (await ana.Client.GetJsonAsync("/api/v1/friends")).GetProperty("items").GetArrayLength().ShouldBe(1);
     }
 

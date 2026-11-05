@@ -389,6 +389,20 @@ public sealed class SocialHandlerTests
     }
 
     [Fact]
+    public void The_graph_survives_the_copy_in_redis()
+    {
+        var graph = new SocialGraph([Ana], [Bea], [Carlos]);
+
+        // HybridCache writes it with the default options of System.Text.Json.
+        var copy = System.Text.Json.JsonSerializer.Deserialize<SocialGraph>(System.Text.Json.JsonSerializer.Serialize(graph))!;
+
+        copy.Friends.ShouldBe([Ana]);
+        copy.IsBlockedEitherWay(Bea).ShouldBeTrue();
+        copy.IsBlockedEitherWay(Carlos).ShouldBeTrue();
+        copy.IsBlockedEitherWay(Ana).ShouldBeFalse();
+    }
+
+    [Fact]
     public void The_validators_accept_only_what_the_contract_says()
     {
         new CreateReportCommandValidator().Validate(new CreateReportCommand(Ana, "User", Bea, "Spam", null)).IsValid.ShouldBeTrue();

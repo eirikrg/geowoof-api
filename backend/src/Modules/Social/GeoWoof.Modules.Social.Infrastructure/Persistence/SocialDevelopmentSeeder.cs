@@ -20,18 +20,15 @@ internal sealed class SocialDevelopmentSeeder(SocialDbContext dbContext, IIdenti
             return;
         }
 
+        // Only once: restarting the API must not bring back a friendship that someone removed while trying the app.
+        if (await dbContext.Friendships.AnyAsync(cancellationToken) || await dbContext.FriendRequests.AnyAsync(cancellationToken))
+        {
+            return;
+        }
+
         var now = timeProvider.GetUtcNow();
-        var friends = new UserPair(anaId, beaId);
-        if (!await dbContext.Friendships.AnyAsync(friendship => friendship.UserAId == friends.Low && friendship.UserBId == friends.High, cancellationToken))
-        {
-            dbContext.Friendships.Add(Friendship.Between(Guid.CreateVersion7(now), anaId, beaId, now));
-        }
-
-        if (!await dbContext.FriendRequests.AnyAsync(request => request.RequesterId == carlosId && request.AddresseeId == anaId, cancellationToken))
-        {
-            dbContext.FriendRequests.Add(FriendRequest.Send(Guid.CreateVersion7(now), carlosId, anaId, now));
-        }
-
+        dbContext.Friendships.Add(Friendship.Between(Guid.CreateVersion7(now), anaId, beaId, now));
+        dbContext.FriendRequests.Add(FriendRequest.Send(Guid.CreateVersion7(now), carlosId, anaId, now));
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }
