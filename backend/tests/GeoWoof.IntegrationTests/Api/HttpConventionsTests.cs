@@ -30,6 +30,22 @@ public sealed class HttpConventionsTests(TestInfrastructure infrastructure)
     }
 
     [Fact]
+    public async Task Dates_are_written_in_utc_with_a_final_z()
+    {
+        await using var factory = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var anonymous = factory.CreateClient();
+
+        using var registered = await anonymous.PostAsJsonAsync(
+            "/api/v1/auth/register",
+            new { email = "ana@example.com", password = TestUser.Password, displayName = "Ana" },
+            TestContext.Current.CancellationToken);
+
+        var session = await registered.JsonAsync();
+        session.GetProperty("accessTokenExpiresAt").GetString().ShouldEndWith("Z");
+        session.GetProperty("user").GetProperty("createdAt").GetString().ShouldEndWith("Z");
+    }
+
+    [Fact]
     public async Task Documentation_is_served_when_enabled()
     {
         await using var factory = await ApiFactory.WithFreshDatabaseAsync(infrastructure, new Dictionary<string, string?> { ["Api:ExposeDocumentation"] = "true" });
