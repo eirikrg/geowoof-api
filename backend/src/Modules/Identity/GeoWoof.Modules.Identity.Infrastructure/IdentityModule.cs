@@ -62,6 +62,21 @@ public static class IdentityModule
                     ClockSkew = TimeSpan.FromSeconds(30),
                     NameClaimType = GeoWoofClaimTypes.Subject,
                 };
+
+                // WebSockets cannot send headers from the app: the token of a hub comes in the URL (docs/realtime.md).
+                bearer.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var token = context.Request.Query["access_token"].ToString();
+                        if (token.Length > 0 && context.HttpContext.Request.Path.StartsWithSegments("/hubs", StringComparison.Ordinal))
+                        {
+                            context.Token = token;
+                        }
+
+                        return Task.CompletedTask;
+                    },
+                };
             });
 
         return services;

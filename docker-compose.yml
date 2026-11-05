@@ -55,6 +55,8 @@ services:
       context: ./backend
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      # Sample walkers in the Retiro, for trying the live map without a second phone.
+      LiveTracking__Simulator__Enabled: "true"
       ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=geowoof;Username=${POSTGRES_USER:-geowoof};Password=${POSTGRES_PASSWORD:-geowoof_dev_only}
       ConnectionStrings__Redis: redis:6379
       Storage__ServiceUrl: http://storage:8333

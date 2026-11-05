@@ -4,6 +4,8 @@ using GeoWoof.BuildingBlocks.Infrastructure;
 using GeoWoof.BuildingBlocks.Infrastructure.Persistence;
 using GeoWoof.Modules.Identity.Infrastructure;
 using GeoWoof.Modules.Identity.Presentation;
+using GeoWoof.Modules.LiveTracking.Infrastructure;
+using GeoWoof.Modules.LiveTracking.Presentation;
 using GeoWoof.Modules.Media.Infrastructure;
 using GeoWoof.Modules.Media.Presentation;
 using GeoWoof.Modules.Pets.Infrastructure;
@@ -25,6 +27,8 @@ builder.Services.AddMediaModule();
 builder.Services.AddPetsModule();
 builder.Services.AddWalksModule();
 builder.Services.AddSocialModule();
+builder.Services.AddLiveTrackingModule();
+builder.Services.AddGeoWoofRealtime(builder.Configuration).AddLiveTrackingHub();
 builder.Services.DecorateApplicationHandlers();
 
 var app = builder.Build();
@@ -40,6 +44,7 @@ api.MapMediaEndpoints();
 api.MapPetsEndpoints();
 api.MapWalksEndpoints();
 api.MapSocialEndpoints();
+app.MapLiveTrackingHub();
 
 await app.InitializeDatabasesAsync();
 await app.RunAsync();

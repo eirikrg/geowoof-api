@@ -26,6 +26,8 @@ public sealed record UpdateMeRequest(string? DisplayName, string? Language);
 
 public sealed record ChangeUsernameRequest(string Username, bool? IsPrivate = null);
 
+public sealed record UpdateSettingsRequest(string? LiveVisibility, int? HideStartDistanceM);
+
 public sealed record ChangePrivacyRequest(bool IsPrivate);
 
 public sealed record DeleteAccountRequest(string? Password, string? GoogleIdToken);

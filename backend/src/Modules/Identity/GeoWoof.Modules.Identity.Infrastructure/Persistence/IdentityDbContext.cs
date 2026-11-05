@@ -46,6 +46,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(user => user.Email).IsUnique();
 
         // Unique among users who chose one; NULLs (onboarding pending) do not collide in PostgreSQL.
+        builder.Property(user => user.LiveVisibility).HasConversion<string>().HasMaxLength(16);
+        builder.Property(user => user.HideStartDistanceM).HasDefaultValue(User.DefaultHideStartDistanceM);
         builder.Property(user => user.Username)
             .HasConversion(username => username!.Value, value => Username.FromStorage(value))
             .HasMaxLength(Username.MaxLength);

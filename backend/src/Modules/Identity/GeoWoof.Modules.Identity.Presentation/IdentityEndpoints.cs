@@ -60,6 +60,8 @@ public static class IdentityEndpoints
             .Produces<ProfileDto>().ProducesValidationProblem().ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         me.MapPut("/privacy", ChangePrivacyAsync).Produces<UserDto>().ProducesValidationProblem();
+        me.MapGet("/settings", GetSettingsAsync).Produces<SettingsDto>();
+        me.MapPatch("/settings", UpdateSettingsAsync).Produces<SettingsDto>().ProducesValidationProblem();
 
         api.MapGet("/users/{id:guid}", GetPublicProfileAsync).WithTags("Account")
             .Produces<ProfileDto>().ProducesProblem(StatusCodes.Status404NotFound);
@@ -208,6 +210,19 @@ public static class IdentityEndpoints
         var command = new UpdateProfileCommand(user.GetUserId(), request.DisplayName, request.Language);
         return (await handler.Handle(command, cancellationToken)).ToHttpResult(TypedResults.Ok);
     }
+
+    private static async Task<IResult> GetSettingsAsync(
+        ClaimsPrincipal user,
+        IQueryHandler<GetSettingsQuery, SettingsDto> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new GetSettingsQuery(user.GetUserId()), cancellationToken)).ToHttpResult(TypedResults.Ok);
+
+    private static async Task<IResult> UpdateSettingsAsync(
+        UpdateSettingsRequest request,
+        ClaimsPrincipal user,
+        ICommandHandler<UpdateSettingsCommand, SettingsDto> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new UpdateSettingsCommand(user.GetUserId(), request.LiveVisibility, request.HideStartDistanceM), cancellationToken)).ToHttpResult(TypedResults.Ok);
 
     private static async Task<IResult> ChangePrivacyAsync(
         ChangePrivacyRequest request,

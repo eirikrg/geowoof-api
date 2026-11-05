@@ -1,3 +1,4 @@
+using GeoWoof.BuildingBlocks.Domain.Visibility;
 using GeoWoof.BuildingBlocks.Infrastructure.Persistence;
 using GeoWoof.Modules.Identity.Application.Abstractions;
 using GeoWoof.Modules.Identity.Domain.Users;
@@ -30,13 +31,13 @@ internal sealed class IdentityDevelopmentSeeder(IdentityDbContext dbContext, IPa
 {
     public const string Password = "GeoWoof2026";
 
-    private static readonly (string Email, string Username, string DisplayName, Language Language, bool IsPrivate)[] SampleUsers =
+    private static readonly (string Email, string Username, string DisplayName, Language Language, bool IsPrivate, LiveVisibility Live)[] SampleUsers =
     [
-        ("ana@geowoof.dev", "ana", "Ana", Language.Es, false),
-        ("bea@geowoof.dev", "bea", "Bea", Language.Es, false),
-        ("carlos@geowoof.dev", "carlos", "Carlos", Language.En, false),
-        ("jose@geowoof.dev", "jose_angel", "José Ángel", Language.Es, false),
-        ("dani@geowoof.dev", "dani", "Dani Prieto", Language.Es, true),
+        ("ana@geowoof.dev", "ana", "Ana", Language.Es, false, LiveVisibility.Everyone),
+        ("bea@geowoof.dev", "bea", "Bea", Language.Es, false, LiveVisibility.FriendsOnly),
+        ("carlos@geowoof.dev", "carlos", "Carlos", Language.En, false, LiveVisibility.Everyone),
+        ("jose@geowoof.dev", "jose_angel", "José Ángel", Language.Es, false, LiveVisibility.Everyone),
+        ("dani@geowoof.dev", "dani", "Dani Prieto", Language.Es, true, LiveVisibility.Everyone),
     ];
 
     public int Order => 0;
@@ -46,8 +47,15 @@ internal sealed class IdentityDevelopmentSeeder(IdentityDbContext dbContext, IPa
         foreach (var sample in SampleUsers)
         {
             var email = Email.Create(sample.Email);
-            if (await dbContext.Users.AnyAsync(user => user.Email == email, cancellationToken))
+            var existing = await dbContext.Users.FirstOrDefaultAsync(user => user.Email == email, cancellationToken);
+            if (existing is not null)
             {
+                // Accounts created before the live map: what someone has chosen is not touched.
+                if (existing.LiveVisibility is null)
+                {
+                    existing.ChangeLiveSettings(sample.Live, hideStartDistanceM: null);
+                }
+
                 continue;
             }
 
@@ -56,6 +64,7 @@ internal sealed class IdentityDevelopmentSeeder(IdentityDbContext dbContext, IPa
             user.MarkEmailVerified();
             user.ChangeUsername(Username.FromStorage(sample.Username));
             user.SetPrivate(sample.IsPrivate);
+            user.ChangeLiveSettings(sample.Live, hideStartDistanceM: null);
             dbContext.Users.Add(user);
         }
 

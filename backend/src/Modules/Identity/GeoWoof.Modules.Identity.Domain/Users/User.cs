@@ -1,4 +1,5 @@
 using GeoWoof.BuildingBlocks.Domain.Entities;
+using GeoWoof.BuildingBlocks.Domain.Visibility;
 
 namespace GeoWoof.Modules.Identity.Domain.Users;
 
@@ -31,6 +32,8 @@ public sealed record UserPrivacyChangedDomainEvent(Guid UserId, bool IsPrivate) 
 /// </summary>
 public sealed class User : AggregateRoot
 {
+    public const int DefaultHideStartDistanceM = 200;
+
     public const int DisplayNameMaxLength = 50;
     public const int BioMaxLength = 300;
     public const int CityMaxLength = 100;
@@ -72,6 +75,12 @@ public sealed class User : AggregateRoot
 
     /// <summary>A private profile only shows its content to those who follow it, and following it needs a yes.</summary>
     public bool IsPrivate { get; private set; }
+
+    /// <summary>Who can see this person on the live map. <c>null</c> until they choose, which counts as friends only.</summary>
+    public LiveVisibility? LiveVisibility { get; private set; }
+
+    /// <summary>How far they go from the start of a walk before the app shares their position.</summary>
+    public int HideStartDistanceM { get; private set; } = DefaultHideStartDistanceM;
 
     public Language Language { get; private set; }
 
@@ -204,6 +213,12 @@ public sealed class User : AggregateRoot
             IsPrivate = isPrivate;
             Raise(new UserPrivacyChangedDomainEvent(Id, isPrivate));
         }
+    }
+
+    public void ChangeLiveSettings(LiveVisibility? liveVisibility, int? hideStartDistanceM)
+    {
+        LiveVisibility = liveVisibility ?? LiveVisibility;
+        HideStartDistanceM = hideStartDistanceM ?? HideStartDistanceM;
     }
 
     /// <summary>Marks the account for deletion; the repository removes it in the same unit of work.</summary>

@@ -25,6 +25,14 @@ public enum ContentVisibility
     OnlyMe = 2,
 }
 
+/// <summary>Who can see someone on the live map while they walk.</summary>
+public enum LiveVisibility
+{
+    Everyone = 0,
+    FriendsOnly = 1,
+    Nobody = 2,
+}
+
 /// <summary>The only place that decides who sees what (docs/api.md, phase 5). A block wins over everything else.</summary>
 public static class VisibilityRules
 {
@@ -52,6 +60,18 @@ public static class VisibilityRules
         viewer != ViewerRelation.Owner
         && CanSee(viewer, visibility, isPrivateProfile)
         && (viewer == ViewerRelation.Friend || !isPrivateProfile);
+
+    /// <summary>
+    /// Where someone is right now is the most delicate of all: a private profile limits it too, so that
+    /// <see cref="LiveVisibility.Everyone"/> means its followers and never a stranger (docs/decisions/0007).
+    /// </summary>
+    public static bool CanSeeLive(ViewerRelation viewer, LiveVisibility visibility, bool isPrivateProfile) =>
+        CanSeeProfileContent(viewer, isPrivateProfile) && visibility switch
+        {
+            LiveVisibility.Everyone => true,
+            LiveVisibility.FriendsOnly => viewer is ViewerRelation.Owner or ViewerRelation.Friend,
+            _ => viewer is ViewerRelation.Owner,
+        };
 
     /// <summary>The same rule for a query, which filters by the visibilities that this viewer can see.</summary>
     public static IReadOnlyList<ContentVisibility> VisibleTo(ViewerRelation viewer, bool isPrivateProfile) =>

@@ -8,6 +8,8 @@
     <ProjectReference Include="..\BuildingBlocks\GeoWoof.BuildingBlocks.Presentation\GeoWoof.BuildingBlocks.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Identity\GeoWoof.Modules.Identity.Infrastructure\GeoWoof.Modules.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Identity\GeoWoof.Modules.Identity.Presentation\GeoWoof.Modules.Identity.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Infrastructure\GeoWoof.Modules.LiveTracking.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Presentation\GeoWoof.Modules.LiveTracking.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Media\GeoWoof.Modules.Media.Infrastructure\GeoWoof.Modules.Media.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Media\GeoWoof.Modules.Media.Presentation\GeoWoof.Modules.Media.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Pets\GeoWoof.Modules.Pets.Infrastructure\GeoWoof.Modules.Pets.Infrastructure.csproj" />
@@ -33,5 +35,6 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
   </ItemGroup>
 </Project>

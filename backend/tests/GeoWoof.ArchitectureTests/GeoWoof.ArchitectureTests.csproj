@@ -28,6 +28,10 @@
     <ProjectReference Include="..\..\src\Modules\Social\GeoWoof.Modules.Social.Infrastructure\GeoWoof.Modules.Social.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Social\GeoWoof.Modules.Social.Presentation\GeoWoof.Modules.Social.Presentation.csproj" />
     <ProjectReference Include="..\..\src\Modules\Social\GeoWoof.Modules.Social.Contracts\GeoWoof.Modules.Social.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Domain\GeoWoof.Modules.LiveTracking.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Application\GeoWoof.Modules.LiveTracking.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Infrastructure\GeoWoof.Modules.LiveTracking.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Presentation\GeoWoof.Modules.LiveTracking.Presentation.csproj" />
     <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Domain\GeoWoof.Modules.Media.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Application\GeoWoof.Modules.Media.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Media\GeoWoof.Modules.Media.Infrastructure\GeoWoof.Modules.Media.Infrastructure.csproj" />

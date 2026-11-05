@@ -86,4 +86,28 @@ public sealed class VisibilityRulesTests
         Enum.GetValues<ViewerRelation>().Length.ShouldBe(5);
         Enum.GetValues<ContentVisibility>().Length.ShouldBe(3);
     }
+
+    [Theory]
+    [InlineData(LiveVisibility.Everyone, ViewerRelation.Friend, false, true)]
+    [InlineData(LiveVisibility.Everyone, ViewerRelation.Follower, false, true)]
+    [InlineData(LiveVisibility.Everyone, ViewerRelation.Stranger, false, true)]
+    [InlineData(LiveVisibility.Everyone, ViewerRelation.Blocked, false, false)]
+    [InlineData(LiveVisibility.Everyone, ViewerRelation.Friend, true, true)]
+    [InlineData(LiveVisibility.Everyone, ViewerRelation.Follower, true, true)]
+    [InlineData(LiveVisibility.Everyone, ViewerRelation.Stranger, true, false)]
+    [InlineData(LiveVisibility.Everyone, ViewerRelation.Blocked, true, false)]
+    [InlineData(LiveVisibility.FriendsOnly, ViewerRelation.Friend, false, true)]
+    [InlineData(LiveVisibility.FriendsOnly, ViewerRelation.Follower, false, false)]
+    [InlineData(LiveVisibility.FriendsOnly, ViewerRelation.Stranger, false, false)]
+    [InlineData(LiveVisibility.FriendsOnly, ViewerRelation.Blocked, false, false)]
+    [InlineData(LiveVisibility.FriendsOnly, ViewerRelation.Friend, true, true)]
+    [InlineData(LiveVisibility.FriendsOnly, ViewerRelation.Follower, true, false)]
+    [InlineData(LiveVisibility.FriendsOnly, ViewerRelation.Stranger, true, false)]
+    [InlineData(LiveVisibility.Nobody, ViewerRelation.Friend, false, false)]
+    [InlineData(LiveVisibility.Nobody, ViewerRelation.Follower, false, false)]
+    [InlineData(LiveVisibility.Nobody, ViewerRelation.Stranger, false, false)]
+    [InlineData(LiveVisibility.Nobody, ViewerRelation.Blocked, false, false)]
+    [InlineData(LiveVisibility.Nobody, ViewerRelation.Friend, true, false)]
+    public void Who_sees_someone_on_the_live_map(LiveVisibility visibility, ViewerRelation viewer, bool isPrivate, bool expected) =>
+        VisibilityRules.CanSeeLive(viewer, visibility, isPrivate).ShouldBe(expected);
 }

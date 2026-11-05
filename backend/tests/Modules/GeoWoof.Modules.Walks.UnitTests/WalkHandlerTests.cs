@@ -767,4 +767,7 @@ internal sealed class FakeIdentity : IIdentityApi
         IReadOnlyDictionary<string, UserSummary> found = Users.Values.Where(user => usernames.Contains(user.Username)).ToDictionary(user => user.Username, StringComparer.Ordinal);
         return Task.FromResult(found);
     }
+
+    public Task<LiveSharingSettings?> GetLiveSharingAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(Users.TryGetValue(userId, out var user) ? new LiveSharingSettings(null, user.IsPrivate) : null);
 }

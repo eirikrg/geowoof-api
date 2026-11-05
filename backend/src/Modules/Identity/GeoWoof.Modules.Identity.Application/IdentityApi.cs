@@ -21,6 +21,11 @@ internal sealed class IdentityApi(IUserRepository users) : IIdentityApi
         return found.ToDictionary(user => user.Username!.Value, ToSummary, StringComparer.Ordinal);
     }
 
+    public async Task<LiveSharingSettings?> GetLiveSharingAsync(Guid userId, CancellationToken cancellationToken) =>
+        await users.GetByIdAsync(userId, cancellationToken) is { } user
+            ? new LiveSharingSettings(user.LiveVisibility?.ToString(), user.IsPrivate)
+            : null;
+
     private static UserSummary ToSummary(User user) =>
         new(user.Id, user.Username!.Value, user.DisplayName, user.City, user.AvatarAssetId, user.IsPrivate);
 }

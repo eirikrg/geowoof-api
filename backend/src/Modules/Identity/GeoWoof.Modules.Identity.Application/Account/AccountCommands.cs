@@ -2,6 +2,7 @@ using FluentValidation;
 using GeoWoof.BuildingBlocks.Application.Messaging;
 using GeoWoof.BuildingBlocks.Application.Persistence;
 using GeoWoof.BuildingBlocks.Domain.Results;
+using GeoWoof.BuildingBlocks.Domain.Visibility;
 using GeoWoof.Modules.Identity.Application.Abstractions;
 using GeoWoof.Modules.Identity.Domain;
 using GeoWoof.Modules.Identity.Domain.Users;
@@ -121,6 +122,55 @@ internal sealed class ChangePrivacyCommandHandler(IUserRepository users, IIdenti
         user.SetPrivate(command.IsPrivate);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return UserDto.From(user);
+    }
+}
+
+public sealed record SettingsDto(string? LiveVisibility, int HideStartDistanceM)
+{
+    public static SettingsDto From(User user) => new(user.LiveVisibility?.ToString(), user.HideStartDistanceM);
+}
+
+public sealed record GetSettingsQuery(Guid UserId) : IQuery<SettingsDto>;
+
+internal sealed class GetSettingsQueryHandler(IUserRepository users) : IQueryHandler<GetSettingsQuery, SettingsDto>
+{
+    public async Task<Result<SettingsDto>> Handle(GetSettingsQuery query, CancellationToken cancellationToken)
+    {
+        var user = await users.GetByIdAsync(query.UserId, cancellationToken);
+        return user is null ? IdentityErrors.AccountNotFound : SettingsDto.From(user);
+    }
+}
+
+public sealed record UpdateSettingsCommand(Guid UserId, string? LiveVisibility, int? HideStartDistanceM) : ICommand<SettingsDto>;
+
+internal sealed class UpdateSettingsCommandValidator : AbstractValidator<UpdateSettingsCommand>
+{
+    private static readonly int[] HideStartDistances = [0, 200, 500];
+
+    public UpdateSettingsCommandValidator()
+    {
+        RuleFor(command => command.LiveVisibility).IsEnumName(typeof(LiveVisibility)).When(command => command.LiveVisibility is not null);
+        RuleFor(command => command.HideStartDistanceM)
+            .Must(distance => distance is null || HideStartDistances.Contains(distance.Value))
+            .WithMessage("It must be 0, 200 or 500.");
+    }
+}
+
+internal sealed class UpdateSettingsCommandHandler(IUserRepository users, IIdentityUnitOfWork unitOfWork)
+    : ICommandHandler<UpdateSettingsCommand, SettingsDto>
+{
+    public async Task<Result<SettingsDto>> Handle(UpdateSettingsCommand command, CancellationToken cancellationToken)
+    {
+        var user = await users.GetByIdAsync(command.UserId, cancellationToken);
+        if (user is null)
+        {
+            return IdentityErrors.AccountNotFound;
+        }
+
+        var visibility = command.LiveVisibility is { } value ? Enum.Parse<LiveVisibility>(value) : (LiveVisibility?)null;
+        user.ChangeLiveSettings(visibility, command.HideStartDistanceM);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return SettingsDto.From(user);
     }
 }
 

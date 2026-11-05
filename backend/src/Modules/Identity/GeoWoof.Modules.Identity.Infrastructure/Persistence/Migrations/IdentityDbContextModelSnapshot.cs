@@ -210,6 +210,12 @@ namespace GeoWoof.Modules.Identity.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("failed_sign_in_attempts");
 
+                    b.Property<int>("HideStartDistanceM")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(200)
+                        .HasColumnName("hide_start_distance_m");
+
                     b.Property<bool>("IsPrivate")
                         .HasColumnType("boolean")
                         .HasColumnName("is_private");
@@ -219,6 +225,11 @@ namespace GeoWoof.Modules.Identity.Infrastructure.Persistence.Migrations
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
                         .HasColumnName("language");
+
+                    b.Property<string>("LiveVisibility")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("live_visibility");
 
                     b.Property<DateTimeOffset?>("LockoutEndsAt")
                         .HasColumnType("timestamp with time zone")

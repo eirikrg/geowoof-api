@@ -7,6 +7,9 @@ public sealed record UserSummary(Guid Id, string Username, string DisplayName, s
     public UserSummary Restricted() => this with { DisplayName = Username, City = null };
 }
 
+/// <summary>What the live map needs to know of someone. <paramref name="Visibility"/> is <c>null</c> until they choose.</summary>
+public sealed record LiveSharingSettings(string? Visibility, bool IsPrivate);
+
 /// <summary>In-process API of the Identity module for other modules.</summary>
 public interface IIdentityApi
 {
@@ -18,4 +21,7 @@ public interface IIdentityApi
 
     /// <summary>The same, by their lower-cased usernames, for the mentions of a text. Those that are not valid are left out.</summary>
     Task<IReadOnlyDictionary<string, UserSummary>> GetPublicUsersByUsernameAsync(IReadOnlyCollection<string> usernames, CancellationToken cancellationToken);
+
+    /// <summary><c>null</c> if the account no longer exists.</summary>
+    Task<LiveSharingSettings?> GetLiveSharingAsync(Guid userId, CancellationToken cancellationToken);
 }

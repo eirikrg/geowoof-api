@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\GeoWoof.BuildingBlocks.Infrastructure\GeoWoof.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\GeoWoof.Modules.LiveTracking.Application\GeoWoof.Modules.LiveTracking.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="GeoWoof.IntegrationTests" />
+  </ItemGroup>
+</Project>
