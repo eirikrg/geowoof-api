@@ -159,6 +159,9 @@ internal sealed class FakeRelationships : IRelationshipsApi
 
     public Task<IReadOnlyCollection<Guid>> GetFollowingIdsAsync(Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyCollection<Guid>>([]);
+
+    public Task<IReadOnlyCollection<Guid>> GetBlockedUserIdsAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<Guid>>([]);
 }
 
 internal sealed class FakeIdentity : IIdentityApi

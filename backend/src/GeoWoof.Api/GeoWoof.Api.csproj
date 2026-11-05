@@ -8,6 +8,10 @@
     <ProjectReference Include="..\BuildingBlocks\GeoWoof.BuildingBlocks.Presentation\GeoWoof.BuildingBlocks.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Identity\GeoWoof.Modules.Identity.Infrastructure\GeoWoof.Modules.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Identity\GeoWoof.Modules.Identity.Presentation\GeoWoof.Modules.Identity.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Chat\GeoWoof.Modules.Chat.Infrastructure\GeoWoof.Modules.Chat.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Chat\GeoWoof.Modules.Chat.Presentation\GeoWoof.Modules.Chat.Presentation.csproj" />
+    <ProjectReference Include="..\Modules\Notifications\GeoWoof.Modules.Notifications.Infrastructure\GeoWoof.Modules.Notifications.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Notifications\GeoWoof.Modules.Notifications.Presentation\GeoWoof.Modules.Notifications.Presentation.csproj" />
     <ProjectReference Include="..\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Infrastructure\GeoWoof.Modules.LiveTracking.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Presentation\GeoWoof.Modules.LiveTracking.Presentation.csproj" />
     <ProjectReference Include="..\Modules\Media\GeoWoof.Modules.Media.Infrastructure\GeoWoof.Modules.Media.Infrastructure.csproj" />

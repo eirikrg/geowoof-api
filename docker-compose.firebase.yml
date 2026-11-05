@@ -1,0 +1,8 @@
+# Real pushes, on top of docker-compose.yml. The key stays outside the repository and is only lent to the container.
+# Set FIREBASE_CREDENTIALS_FILE in .env, and see docs/setup.md (5.3) for how to use this file.
+services:
+  api:
+    environment:
+      Firebase__CredentialsPath: /run/secrets/firebase-admin.json
+    volumes:
+      - ${FIREBASE_CREDENTIALS_FILE:?Set FIREBASE_CREDENTIALS_FILE in .env}:/run/secrets/firebase-admin.json:ro

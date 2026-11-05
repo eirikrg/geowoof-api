@@ -375,4 +375,7 @@ internal sealed class FakeRelationships : IRelationshipsApi
         IReadOnlyCollection<Guid> following = _follows.Where(follow => follow.Follower == userId).Select(follow => follow.Followee).ToList();
         return Task.FromResult(following);
     }
+
+    public Task<IReadOnlyCollection<Guid>> GetBlockedUserIdsAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyCollection<Guid>>([]);
 }

@@ -7,6 +7,7 @@ public enum MediaUsage
     PetAvatar = 1,
     WalkPhoto = 2,
     PostImage = 3,
+    ChatImage = 4,
 }
 
 /// <summary>An image with its signed URLs, which are <c>null</c> until it has been processed.</summary>

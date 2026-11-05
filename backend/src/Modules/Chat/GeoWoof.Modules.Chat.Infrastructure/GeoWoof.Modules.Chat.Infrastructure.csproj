@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\GeoWoof.BuildingBlocks.Infrastructure\GeoWoof.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\GeoWoof.Modules.Chat.Application\GeoWoof.Modules.Chat.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Design-time services for `dotnet ef migrations`. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="GeoWoof.Modules.Chat.UnitTests" />
+    <InternalsVisibleTo Include="GeoWoof.IntegrationTests" />
+  </ItemGroup>
+</Project>

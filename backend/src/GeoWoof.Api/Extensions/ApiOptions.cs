@@ -28,4 +28,8 @@ internal sealed class ApiOptions
     /// <summary>What reaches another person (friend requests, reports) per minute and user.</summary>
     [Range(1, 100_000)]
     public int SocialWritesPermitsPerMinute { get; set; } = 30;
+
+    /// <summary>Messages sent per minute and user.</summary>
+    [Range(1, 100_000)]
+    public int ChatMessagesPermitsPerMinute { get; set; } = 60;
 }

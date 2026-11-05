@@ -10,6 +10,19 @@
     <Project Path="src/BuildingBlocks/GeoWoof.BuildingBlocks.Presentation/GeoWoof.BuildingBlocks.Presentation.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Chat/">
+    <Project Path="src/Modules/Chat/GeoWoof.Modules.Chat.Application/GeoWoof.Modules.Chat.Application.csproj" />
+    <Project Path="src/Modules/Chat/GeoWoof.Modules.Chat.Contracts/GeoWoof.Modules.Chat.Contracts.csproj" />
+    <Project Path="src/Modules/Chat/GeoWoof.Modules.Chat.Domain/GeoWoof.Modules.Chat.Domain.csproj" />
+    <Project Path="src/Modules/Chat/GeoWoof.Modules.Chat.Infrastructure/GeoWoof.Modules.Chat.Infrastructure.csproj" />
+    <Project Path="src/Modules/Chat/GeoWoof.Modules.Chat.Presentation/GeoWoof.Modules.Chat.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Notifications/">
+    <Project Path="src/Modules/Notifications/GeoWoof.Modules.Notifications.Application/GeoWoof.Modules.Notifications.Application.csproj" />
+    <Project Path="src/Modules/Notifications/GeoWoof.Modules.Notifications.Domain/GeoWoof.Modules.Notifications.Domain.csproj" />
+    <Project Path="src/Modules/Notifications/GeoWoof.Modules.Notifications.Infrastructure/GeoWoof.Modules.Notifications.Infrastructure.csproj" />
+    <Project Path="src/Modules/Notifications/GeoWoof.Modules.Notifications.Presentation/GeoWoof.Modules.Notifications.Presentation.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/GeoWoof.Modules.Identity.Application/GeoWoof.Modules.Identity.Application.csproj" />
     <Project Path="src/Modules/Identity/GeoWoof.Modules.Identity.Contracts/GeoWoof.Modules.Identity.Contracts.csproj" />
@@ -58,6 +71,8 @@
   </Folder>
   <Folder Name="/tests/Modules/">
     <Project Path="tests/Modules/GeoWoof.Modules.Identity.UnitTests/GeoWoof.Modules.Identity.UnitTests.csproj" />
+    <Project Path="tests/Modules/GeoWoof.Modules.Chat.UnitTests/GeoWoof.Modules.Chat.UnitTests.csproj" />
+    <Project Path="tests/Modules/GeoWoof.Modules.Notifications.UnitTests/GeoWoof.Modules.Notifications.UnitTests.csproj" />
     <Project Path="tests/Modules/GeoWoof.Modules.LiveTracking.UnitTests/GeoWoof.Modules.LiveTracking.UnitTests.csproj" />
     <Project Path="tests/Modules/GeoWoof.Modules.Media.UnitTests/GeoWoof.Modules.Media.UnitTests.csproj" />
     <Project Path="tests/Modules/GeoWoof.Modules.Pets.UnitTests/GeoWoof.Modules.Pets.UnitTests.csproj" />

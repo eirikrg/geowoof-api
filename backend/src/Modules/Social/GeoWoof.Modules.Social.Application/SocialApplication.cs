@@ -54,4 +54,7 @@ internal sealed class RelationshipsApi(ISocialGraphCache graphs) : IRelationship
 
     public async Task<IReadOnlyCollection<Guid>> GetFollowingIdsAsync(Guid userId, CancellationToken cancellationToken) =>
         (await graphs.GetAsync(userId, cancellationToken)).Following;
+
+    public async Task<IReadOnlyCollection<Guid>> GetBlockedUserIdsAsync(Guid userId, CancellationToken cancellationToken) =>
+        (await graphs.GetAsync(userId, cancellationToken)).Blocked;
 }

@@ -71,6 +71,7 @@ internal static class ApiServiceCollectionExtensions
         options.AddPolicy(RateLimitPolicies.Authentication, context => PerIpPerMinute(context, RateLimitPolicies.Authentication, api.AuthPermitsPerMinute));
         options.AddPolicy(RateLimitPolicies.TokenRefresh, context => PerIpPerMinute(context, RateLimitPolicies.TokenRefresh, api.RefreshPermitsPerMinute));
         options.AddPolicy(RateLimitPolicies.SocialWrites, context => PerUserPerMinute(context, RateLimitPolicies.SocialWrites, api.SocialWritesPermitsPerMinute));
+        options.AddPolicy(RateLimitPolicies.ChatMessages, context => PerUserPerMinute(context, RateLimitPolicies.ChatMessages, api.ChatMessagesPermitsPerMinute));
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             RateLimitPartition.GetTokenBucketLimiter(
                 PartitionKeyFor(context),

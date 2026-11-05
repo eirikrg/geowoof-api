@@ -21,6 +21,9 @@ public static class RateLimitPolicies
 
     /// <summary>What reaches another person (friend requests, reports), per user.</summary>
     public const string SocialWrites = "social-writes";
+
+    /// <summary>Messages sent, per user.</summary>
+    public const string ChatMessages = "chat-messages";
 }
 
 public static class ClaimsPrincipalExtensions

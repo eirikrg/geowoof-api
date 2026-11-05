@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\GeoWoof.BuildingBlocks.Application\GeoWoof.BuildingBlocks.Application.csproj" />
+    <ProjectReference Include="..\GeoWoof.Modules.Chat.Domain\GeoWoof.Modules.Chat.Domain.csproj" />
+    <ProjectReference Include="..\..\Identity\GeoWoof.Modules.Identity.Contracts\GeoWoof.Modules.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\..\Media\GeoWoof.Modules.Media.Contracts\GeoWoof.Modules.Media.Contracts.csproj" />
+    <ProjectReference Include="..\..\Social\GeoWoof.Modules.Social.Contracts\GeoWoof.Modules.Social.Contracts.csproj" />
+    <ProjectReference Include="..\GeoWoof.Modules.Chat.Contracts\GeoWoof.Modules.Chat.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="GeoWoof.Modules.Chat.Infrastructure" />
+    <InternalsVisibleTo Include="GeoWoof.Modules.Chat.Presentation" />
+    <InternalsVisibleTo Include="GeoWoof.Modules.Chat.UnitTests" />
+    <InternalsVisibleTo Include="GeoWoof.IntegrationTests" />
+  </ItemGroup>
+</Project>

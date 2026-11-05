@@ -1,15 +1,25 @@
+using System.Security.Claims;
 using System.Text.Json.Serialization;
+using GeoWoof.BuildingBlocks.Application.Security;
 using GeoWoof.BuildingBlocks.Infrastructure.Caching;
 using Microsoft.AspNetCore.SignalR;
 using StackExchange.Redis;
 
 namespace GeoWoof.Api.Extensions;
 
+internal sealed class SubjectUserIdProvider : IUserIdProvider
+{
+    public string? GetUserId(HubConnectionContext connection) =>
+        connection.User.FindFirstValue(GeoWoofClaimTypes.Subject);
+}
+
 internal static class RealtimeExtensions
 {
     /// <summary>The same JSON as the API (docs/realtime.md), and Redis so that several instances share the messages.</summary>
     public static ISignalRServerBuilder AddGeoWoofRealtime(this IServiceCollection services, IConfiguration configuration)
     {
+        // The token says who someone is with `sub`, which is what messages to a person go by.
+        services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
         return services.AddSignalR()
             .AddJsonProtocol(options =>
             {

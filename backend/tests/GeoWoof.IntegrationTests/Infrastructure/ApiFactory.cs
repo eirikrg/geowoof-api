@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using GeoWoof.Modules.Identity.Application.Abstractions;
+using GeoWoof.Modules.Notifications.Application;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -12,12 +13,18 @@ namespace GeoWoof.IntegrationTests.Infrastructure;
 /// Hosts the real API (Program.cs) against the test containers, in the <c>Testing</c> environment,
 /// with migrations applied. Emails are captured and Google ID tokens are validated by a fake.
 /// </summary>
-public sealed class ApiFactory(TestInfrastructure infrastructure, IReadOnlyDictionary<string, string?>? overrides = null)
+public sealed class ApiFactory(TestInfrastructure infrastructure, IReadOnlyDictionary<string, string?>? overrides = null, bool usesRealPushSender = false)
     : WebApplicationFactory<Program>
 {
     public const string SigningKey = "integration-tests-signing-key-with-32-chars-or-more";
 
+    /// <summary>With the sender of a real API: the log, or Firebase with that key. Nobody registers in it, so it needs no database of its own.</summary>
+    public static ApiFactory WithRealPushSender(TestInfrastructure infrastructure, string? credentialsPath = null) =>
+        new(infrastructure, new Dictionary<string, string?>(StringComparer.Ordinal) { ["Firebase:CredentialsPath"] = credentialsPath }, usesRealPushSender: true);
+
     public CapturingEmailSender Emails { get; } = new();
+
+    public RecordingPushSender Pushes { get; } = new();
 
     public FakeGoogleValidator Google { get; } = new();
 
@@ -62,6 +69,8 @@ public sealed class ApiFactory(TestInfrastructure infrastructure, IReadOnlyDicti
             ["Api:AuthPermitsPerMinute"] = "10000",
             ["Api:RefreshPermitsPerMinute"] = "10000",
             ["Api:SocialWritesPermitsPerMinute"] = "10000",
+            ["Api:ChatMessagesPermitsPerMinute"] = "10000",
+            ["Chat:KeyPrefix"] = $"chat-{Guid.NewGuid():N}:",
         };
         foreach (var (key, value) in overrides ?? new Dictionary<string, string?>())
         {
@@ -79,7 +88,57 @@ public sealed class ApiFactory(TestInfrastructure infrastructure, IReadOnlyDicti
             services.AddSingleton<IEmailSender>(Emails);
             services.RemoveAll<IGoogleIdTokenValidator>();
             services.AddSingleton<IGoogleIdTokenValidator>(Google);
+            if (!usesRealPushSender)
+            {
+                services.RemoveAll<IPushSender>();
+                services.AddSingleton<IPushSender>(Pushes);
+            }
         });
+    }
+}
+
+/// <summary>Keeps every push the API sends. It decides which tokens are no longer valid, and whether FCM fails.</summary>
+public sealed class RecordingPushSender : IPushSender
+{
+    private readonly List<(IReadOnlyList<string> Tokens, PushMessage Message)> _sent = [];
+
+    public HashSet<string> InvalidTokens { get; } = new(StringComparer.Ordinal);
+
+    public bool Fails { get; set; }
+
+    public IReadOnlyList<(IReadOnlyList<string> Tokens, PushMessage Message)> Sent
+    {
+        get
+        {
+            lock (_sent)
+            {
+                return _sent.ToList();
+            }
+        }
+    }
+
+    public void Clear()
+    {
+        lock (_sent)
+        {
+            _sent.Clear();
+        }
+    }
+
+    public Task<IReadOnlyList<string>> SendAsync(IReadOnlyList<string> tokens, PushMessage message, CancellationToken cancellationToken)
+    {
+        if (Fails)
+        {
+            throw new InvalidOperationException("FCM is down.");
+        }
+
+        lock (_sent)
+        {
+            _sent.Add((tokens, message));
+        }
+
+        IReadOnlyList<string> invalid = tokens.Where(InvalidTokens.Contains).ToList();
+        return Task.FromResult(invalid);
     }
 }
 

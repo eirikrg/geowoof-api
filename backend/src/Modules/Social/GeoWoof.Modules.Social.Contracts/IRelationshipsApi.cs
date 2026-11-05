@@ -25,4 +25,7 @@ public interface IRelationshipsApi
 
     /// <summary>The people this user follows, whose private profiles they can see.</summary>
     Task<IReadOnlyCollection<Guid>> GetFollowingIdsAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Only those this person has blocked, and not those who have blocked them.</summary>
+    Task<IReadOnlyCollection<Guid>> GetBlockedUserIdsAsync(Guid userId, CancellationToken cancellationToken);
 }

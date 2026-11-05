@@ -42,6 +42,7 @@
   <ItemGroup Label="Infrastructure integrations">
     <PackageVersion Include="StackExchange.Redis" Version="3.4.31" />
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.14" />
+    <PackageVersion Include="FirebaseAdmin" Version="3.7.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.11.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.14" />
     <PackageVersion Include="SkiaSharp" Version="4.154.0" />

@@ -28,6 +28,15 @@
     <ProjectReference Include="..\..\src\Modules\Social\GeoWoof.Modules.Social.Infrastructure\GeoWoof.Modules.Social.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Social\GeoWoof.Modules.Social.Presentation\GeoWoof.Modules.Social.Presentation.csproj" />
     <ProjectReference Include="..\..\src\Modules\Social\GeoWoof.Modules.Social.Contracts\GeoWoof.Modules.Social.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Chat\GeoWoof.Modules.Chat.Domain\GeoWoof.Modules.Chat.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Chat\GeoWoof.Modules.Chat.Application\GeoWoof.Modules.Chat.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Chat\GeoWoof.Modules.Chat.Infrastructure\GeoWoof.Modules.Chat.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Chat\GeoWoof.Modules.Chat.Presentation\GeoWoof.Modules.Chat.Presentation.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Chat\GeoWoof.Modules.Chat.Contracts\GeoWoof.Modules.Chat.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\GeoWoof.Modules.Notifications.Domain\GeoWoof.Modules.Notifications.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\GeoWoof.Modules.Notifications.Application\GeoWoof.Modules.Notifications.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\GeoWoof.Modules.Notifications.Infrastructure\GeoWoof.Modules.Notifications.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\GeoWoof.Modules.Notifications.Presentation\GeoWoof.Modules.Notifications.Presentation.csproj" />
     <ProjectReference Include="..\..\src\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Domain\GeoWoof.Modules.LiveTracking.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Application\GeoWoof.Modules.LiveTracking.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\LiveTracking\GeoWoof.Modules.LiveTracking.Infrastructure\GeoWoof.Modules.LiveTracking.Infrastructure.csproj" />

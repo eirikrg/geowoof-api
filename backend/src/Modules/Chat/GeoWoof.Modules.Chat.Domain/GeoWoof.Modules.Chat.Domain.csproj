@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\GeoWoof.BuildingBlocks.Domain\GeoWoof.BuildingBlocks.Domain.csproj" />
+  </ItemGroup>
+</Project>
