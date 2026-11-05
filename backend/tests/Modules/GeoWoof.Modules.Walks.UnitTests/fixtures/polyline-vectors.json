@@ -1,0 +1,115 @@
+[
+  {
+    "name": "Empty",
+    "encoded": "",
+    "points": []
+  },
+  {
+    "name": "Origin",
+    "encoded": "??",
+    "points": [
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  {
+    "name": "Smallest positive",
+    "encoded": "AA",
+    "points": [
+      [
+        1e-05,
+        1e-05
+      ]
+    ]
+  },
+  {
+    "name": "Smallest negative",
+    "encoded": "@@",
+    "points": [
+      [
+        -1e-05,
+        -1e-05
+      ]
+    ]
+  },
+  {
+    "name": "Example of the Google documentation",
+    "encoded": "_p~iF~ps|U_ulLnnqC_mqNvxq`@",
+    "points": [
+      [
+        38.5,
+        -120.2
+      ],
+      [
+        40.7,
+        -120.95
+      ],
+      [
+        43.252,
+        -126.453
+      ]
+    ]
+  },
+  {
+    "name": "Madrid",
+    "encoded": "_|tuFvkrUSSg@g@",
+    "points": [
+      [
+        40.4168,
+        -3.7038
+      ],
+      [
+        40.4169,
+        -3.7037
+      ],
+      [
+        40.4171,
+        -3.7035
+      ]
+    ]
+  },
+  {
+    "name": "Same point twice",
+    "encoded": "_|tuFvkrU??",
+    "points": [
+      [
+        40.4168,
+        -3.7038
+      ],
+      [
+        40.4168,
+        -3.7038
+      ]
+    ]
+  },
+  {
+    "name": "Limits of the coordinates",
+    "encoded": "_cidP_gsia@~fsia@~ngtcA",
+    "points": [
+      [
+        90.0,
+        180.0
+      ],
+      [
+        -90.0,
+        -180.0
+      ]
+    ]
+  },
+  {
+    "name": "Both hemispheres",
+    "encoded": "~~umEca|y[g`bhOz_uz[",
+    "points": [
+      [
+        -33.8688,
+        151.2093
+      ],
+      [
+        51.5074,
+        -0.1278
+      ]
+    ]
+  }
+]
