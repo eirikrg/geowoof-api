@@ -1,9 +1,10 @@
+using GeoWoof.BuildingBlocks.Domain.Results;
 using GeoWoof.Modules.Identity.Contracts;
 using GeoWoof.Modules.Social.Application;
 using GeoWoof.Modules.Social.Application.Abstractions;
 using GeoWoof.Modules.Social.Application.Blocks;
 using GeoWoof.Modules.Social.Application.Events;
-using GeoWoof.Modules.Social.Application.Friends;
+using GeoWoof.Modules.Social.Application.Follows;
 using GeoWoof.Modules.Social.Application.Reports;
 using GeoWoof.Modules.Social.Contracts;
 using GeoWoof.Modules.Social.Domain;
@@ -16,11 +17,12 @@ public sealed class SocialHandlerTests
     private static readonly Guid Ana = Guid.CreateVersion7();
     private static readonly Guid Bea = Guid.CreateVersion7();
     private static readonly Guid Carlos = Guid.CreateVersion7();
+    private static readonly Guid Dani = Guid.CreateVersion7();
     private static readonly DateTimeOffset Now = new(2026, 11, 5, 10, 0, 0, TimeSpan.Zero);
 
     private readonly FakeTimeProvider _time = new(Now);
+    private readonly FakeFollows _follows = new();
     private readonly FakeRequests _requests = new();
-    private readonly FakeFriendships _friendships = new();
     private readonly FakeBlocks _blocks = new();
     private readonly FakeReports _reports = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
@@ -29,94 +31,135 @@ public sealed class SocialHandlerTests
 
     public SocialHandlerTests()
     {
-        _graphs = new FakeGraphs(_friendships, _blocks);
+        _graphs = new FakeGraphs(_follows, _blocks);
         _identity.Add(Ana, "ana");
         _identity.Add(Bea, "bea");
         _identity.Add(Carlos, "carlos");
+        _identity.Add(Dani, "dani", isPrivate: true);
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    private UserSummaries Summaries => new(_identity, new FakeMedia());
+    private UserSummaries Summaries => new(_identity, _graphs, new FakeMedia());
 
-    private FriendRequestAcceptance Acceptance => new(_friendships, _time);
+    private RelationshipReader Reader => new(_graphs, _requests);
 
-    private SendFriendRequestCommandHandler SendHandler => new(_requests, _friendships, _graphs, _unitOfWork, Acceptance, Summaries, _time);
+    private FollowService Service => new(_follows, _time);
 
-    private AcceptFriendRequestCommandHandler AcceptHandler => new(_requests, _graphs, _unitOfWork, Acceptance, Summaries);
+    private Task<Result<RelationshipDto>> FollowAsync(Guid from, Guid to) =>
+        new FollowUserCommandHandler(_follows, _requests, _identity, _graphs, _unitOfWork, Service, Reader, _time).Handle(new FollowUserCommand(from, to), Token);
 
-    private GetRelationshipQueryHandler RelationshipHandler => new(_requests, _graphs, Summaries);
+    private Task<Result<RelationshipDto>> UnfollowAsync(Guid from, Guid to) =>
+        new UnfollowUserCommandHandler(_follows, _requests, _identity, _graphs, _unitOfWork, Service, Reader, _time).Handle(new UnfollowUserCommand(from, to), Token);
 
-    private BlockUserCommandHandler BlockHandler => new(_blocks, _friendships, _requests, _identity, _graphs, _unitOfWork, _time);
+    private Task<Result<RelationshipDto>> RemoveFollowerAsync(Guid user, Guid follower) =>
+        new RemoveFollowerCommandHandler(_follows, _identity, _graphs, _unitOfWork, Service, Reader).Handle(new RemoveFollowerCommand(user, follower), Token);
 
-    private Task<BuildingBlocks.Domain.Results.Result<SendFriendRequestResult>> SendAsync(Guid from, Guid to) =>
-        SendHandler.Handle(new SendFriendRequestCommand(from, to), Token);
+    private Task<Result<RelationshipDto>> AcceptAsync(Guid user, Guid request) =>
+        new AcceptFollowRequestCommandHandler(_requests, _graphs, _unitOfWork, Service, Reader, _time).Handle(new AcceptFollowRequestCommand(user, request), Token);
 
-    private async Task BlockAsync(Guid from, Guid to) => (await BlockHandler.Handle(new BlockUserCommand(from, to), Token)).IsSuccess.ShouldBeTrue();
+    private Task<Result> RejectAsync(Guid user, Guid request) =>
+        new RejectFollowRequestCommandHandler(_requests, _unitOfWork, _time).Handle(new RejectFollowRequestCommand(user, request), Token);
 
-    private async Task<string> RelationshipAsync(Guid viewer, Guid user) =>
-        (await RelationshipHandler.Handle(new GetRelationshipQuery(viewer, user), Token)).Value.Status;
+    private Task<Result> CancelAsync(Guid user, Guid request) =>
+        new CancelFollowRequestCommandHandler(_requests, _unitOfWork, _time).Handle(new CancelFollowRequestCommand(user, request), Token);
 
-    private void Befriend(Guid first, Guid second) => _friendships.Add(Friendship.Between(Guid.CreateVersion7(), first, second, Now));
+    private Task<Result<RelationshipDto>> RelationshipAsync(Guid viewer, Guid user) =>
+        new GetRelationshipQueryHandler(_identity, Reader).Handle(new GetRelationshipQuery(viewer, user), Token);
 
-    [Fact]
-    public async Task A_new_request_is_created_and_can_be_sent_again_without_duplicating_it()
+    private Task<Result<BuildingBlocks.Application.Paging.PagedResponse<PersonDto>>> PeopleAsync(Guid viewer, Guid user, PeopleList list) =>
+        new GetPeopleQueryHandler(_follows, _identity, _graphs, Summaries).Handle(new GetPeopleQuery(viewer, user, list, null, null), Token);
+
+    private Task<Result> BlockAsync(Guid from, Guid to) =>
+        new BlockUserCommandHandler(_blocks, _follows, _requests, _identity, _graphs, _unitOfWork, _time).Handle(new BlockUserCommand(from, to), Token);
+
+    private void AddFollow(Guid follower, Guid followee) =>
+        _follows.Add(Follow.Start(Guid.CreateVersion7(), follower, followee, theyFollowBack: false, Now));
+
+    private void Befriend(Guid first, Guid second)
     {
-        var first = await SendAsync(Ana, Bea);
-        var second = await SendAsync(Ana, Bea);
+        AddFollow(first, second);
+        AddFollow(second, first);
+    }
 
-        first.Value.Created.ShouldBeTrue();
-        first.Value.Request.Direction.ShouldBe("Sent");
-        first.Value.Request.Status.ShouldBe("Pending");
-        first.Value.Request.User.Id.ShouldBe(Bea);
-        second.Value.Created.ShouldBeFalse();
-        second.Value.Request.Id.ShouldBe(first.Value.Request.Id);
-        _requests.Items.Count.ShouldBe(1);
+    private FollowRequest AddRequest(Guid requester, Guid target)
+    {
+        var request = FollowRequest.Send(Guid.CreateVersion7(), requester, target, Now);
+        _requests.Add(request);
+        return request;
     }
 
     [Fact]
-    public async Task Asking_someone_who_had_already_asked_makes_you_friends()
+    public async Task Following_a_public_profile_is_immediate_and_repeating_it_changes_nothing()
     {
-        await SendAsync(Bea, Ana);
+        var first = await FollowAsync(Ana, Bea);
+        var second = await FollowAsync(Ana, Bea);
 
-        var answer = await SendAsync(Ana, Bea);
-
-        answer.Value.Created.ShouldBeFalse();
-        answer.Value.Request.Status.ShouldBe("Accepted");
-        answer.Value.Request.Direction.ShouldBe("Received");
-        _friendships.Items.Count.ShouldBe(1);
+        first.Value.ShouldBe(new RelationshipDto("Following", false, null, null));
+        second.Value.Status.ShouldBe("Following");
+        _follows.Items.Count.ShouldBe(1);
+        _requests.Items.ShouldBeEmpty();
         _graphs.Invalidated.ShouldBe([Ana, Bea], ignoreOrder: true);
     }
 
     [Fact]
-    public async Task Two_people_asking_at_the_same_time_end_up_as_friends()
+    public async Task Following_a_private_profile_asks_first_and_repeating_it_does_not_ask_twice()
     {
-        // What Bea sent while this request was saving: the database rejects a second pending request.
+        var first = await FollowAsync(Ana, Dani);
+        var second = await FollowAsync(Ana, Dani);
+
+        first.Value.Status.ShouldBe("Requested");
+        first.Value.RequestId.ShouldBe(_requests.Items.Single().Id);
+        second.Value.Status.ShouldBe("Requested");
+        _follows.Items.ShouldBeEmpty();
+        _requests.Items.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Someone_who_already_follows_a_profile_that_became_private_stays_a_follower()
+    {
+        AddFollow(Ana, Dani);
+
+        var answer = await FollowAsync(Ana, Dani);
+
+        answer.Value.Status.ShouldBe("Following");
+        _requests.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Following_someone_who_already_follows_you_makes_you_friends()
+    {
+        AddFollow(Bea, Ana);
+
+        var answer = await FollowAsync(Ana, Bea);
+
+        answer.Value.Status.ShouldBe("Friends");
+        answer.Value.FollowsYou.ShouldBeTrue();
+        _follows.Items.Single(follow => follow.FollowerId == Ana).DomainEvents.OfType<FriendshipStartedDomainEvent>().ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Two_people_following_at_the_same_time_end_up_as_friends()
+    {
+        // The database rejects this save because the row is already there.
+        AddFollow(Bea, Ana);
         _unitOfWork.FailNextSave = true;
         _unitOfWork.OnDiscard = () =>
         {
-            _requests.Items.Clear();
-            _requests.Add(FriendRequest.Send(Guid.CreateVersion7(), Bea, Ana, Now));
+            _follows.Items.RemoveAll(follow => follow.FollowerId == Ana);
+            AddFollow(Ana, Bea);
         };
 
-        var answer = await SendAsync(Ana, Bea);
+        var answer = await FollowAsync(Ana, Bea);
 
-        answer.Value.Request.Status.ShouldBe("Accepted");
-        _friendships.Items.Count.ShouldBe(1);
+        answer.Value.Status.ShouldBe("Friends");
+        _follows.Items.Count.ShouldBe(2);
     }
 
     [Fact]
-    public async Task You_cannot_ask_yourself()
+    public async Task Nobody_can_follow_themselves()
     {
-        (await SendAsync(Ana, Ana)).Error.ShouldBe(SocialErrors.CannotTargetSelf);
-    }
-
-    [Fact]
-    public async Task You_cannot_ask_a_friend()
-    {
-        Befriend(Ana, Bea);
-
-        (await SendAsync(Ana, Bea)).Error.ShouldBe(SocialErrors.AlreadyFriends);
+        (await FollowAsync(Ana, Ana)).Error.ShouldBe(SocialErrors.CannotTargetSelf);
     }
 
     [Fact]
@@ -125,102 +168,279 @@ public sealed class SocialHandlerTests
         await BlockAsync(Bea, Ana);
         await BlockAsync(Ana, Carlos);
 
-        (await SendAsync(Ana, Guid.CreateVersion7())).Error.ShouldBe(SocialErrors.UserNotFound);
-        (await SendAsync(Ana, Bea)).Error.ShouldBe(SocialErrors.UserNotFound);
-        (await SendAsync(Ana, Carlos)).Error.ShouldBe(SocialErrors.UserNotFound);
+        (await FollowAsync(Ana, Guid.CreateVersion7())).Error.ShouldBe(SocialErrors.UserNotFound);
+        (await FollowAsync(Ana, Bea)).Error.ShouldBe(SocialErrors.UserNotFound);
+        (await FollowAsync(Ana, Carlos)).Error.ShouldBe(SocialErrors.UserNotFound);
     }
 
     [Fact]
-    public async Task Accepting_creates_one_friendship_even_if_repeated()
+    public async Task Stopping_ends_the_friendship_for_both_and_forgets_their_graphs()
     {
-        var request = (await SendAsync(Bea, Ana)).Value.Request;
+        Befriend(Ana, Bea);
 
-        var first = await AcceptHandler.Handle(new AcceptFriendRequestCommand(Ana, request.Id), Token);
-        var second = await AcceptHandler.Handle(new AcceptFriendRequestCommand(Ana, request.Id), Token);
+        var answer = await UnfollowAsync(Ana, Bea);
 
-        first.Value.Status.ShouldBe("Accepted");
-        second.Value.Status.ShouldBe("Accepted");
-        _friendships.Items.Count.ShouldBe(1);
+        answer.Value.Status.ShouldBe("None");
+        answer.Value.FollowsYou.ShouldBeTrue();
+        _follows.Items.Single().FollowerId.ShouldBe(Bea);
+        _graphs.Invalidated.ShouldBe([Ana, Bea], ignoreOrder: true);
+        (await RelationshipAsync(Bea, Ana)).Value.Status.ShouldBe("Following");
     }
 
     [Fact]
-    public async Task Only_who_receives_a_request_can_accept_or_reject_it()
+    public async Task Stopping_cancels_the_request_that_was_not_answered()
     {
-        var request = (await SendAsync(Bea, Ana)).Value.Request;
+        await FollowAsync(Ana, Dani);
 
-        (await AcceptHandler.Handle(new AcceptFriendRequestCommand(Bea, request.Id), Token)).Error.ShouldBe(SocialErrors.RequestNotFound);
-        (await AcceptHandler.Handle(new AcceptFriendRequestCommand(Carlos, request.Id), Token)).Error.ShouldBe(SocialErrors.RequestNotFound);
-        (await new RejectFriendRequestCommandHandler(_requests, _unitOfWork, _time).Handle(new RejectFriendRequestCommand(Carlos, request.Id), Token))
-            .Error.ShouldBe(SocialErrors.RequestNotFound);
-        _friendships.Items.ShouldBeEmpty();
+        var answer = await UnfollowAsync(Ana, Dani);
+
+        answer.Value.Status.ShouldBe("None");
+        _requests.Items.Single().Status.ShouldBe(FollowRequestStatus.Cancelled);
     }
 
     [Fact]
-    public async Task Only_who_sent_a_request_can_cancel_it()
+    public async Task Stopping_when_nothing_is_there_changes_nothing()
     {
-        var request = (await SendAsync(Bea, Ana)).Value.Request;
-        var handler = new CancelFriendRequestCommandHandler(_requests, _unitOfWork, _time);
+        (await UnfollowAsync(Ana, Bea)).Value.Status.ShouldBe("None");
+    }
 
-        (await handler.Handle(new CancelFriendRequestCommand(Ana, request.Id), Token)).Error.ShouldBe(SocialErrors.RequestNotFound);
-        (await handler.Handle(new CancelFriendRequestCommand(Bea, request.Id), Token)).IsSuccess.ShouldBeTrue();
-        (await AcceptHandler.Handle(new AcceptFriendRequestCommand(Ana, request.Id), Token)).Error.ShouldBe(SocialErrors.RequestNotPending);
+    [Fact]
+    public async Task Removing_a_follower_ends_the_friendship_but_you_keep_following_them()
+    {
+        Befriend(Ana, Bea);
+
+        var answer = await RemoveFollowerAsync(Ana, Bea);
+
+        answer.Value.Status.ShouldBe("Following");
+        answer.Value.FollowsYou.ShouldBeFalse();
+        _follows.Items.Single().FollowerId.ShouldBe(Ana);
+    }
+
+    [Fact]
+    public async Task Accepting_lets_that_person_follow_you_and_does_not_make_you_follow_them()
+    {
+        var request = AddRequest(Ana, Dani);
+
+        var answer = await AcceptAsync(Dani, request.Id);
+
+        answer.Value.Status.ShouldBe("None");
+        answer.Value.FollowsYou.ShouldBeTrue();
+        _follows.Items.Single().FollowerId.ShouldBe(Ana);
+        (await RelationshipAsync(Ana, Dani)).Value.Status.ShouldBe("Following");
+    }
+
+    [Fact]
+    public async Task Accepting_someone_you_follow_makes_you_friends()
+    {
+        AddFollow(Dani, Ana);
+        var request = AddRequest(Ana, Dani);
+
+        (await AcceptAsync(Dani, request.Id)).Value.Status.ShouldBe("Friends");
+    }
+
+    [Fact]
+    public async Task Accepting_twice_creates_one_follow()
+    {
+        var request = AddRequest(Ana, Dani);
+
+        await AcceptAsync(Dani, request.Id);
+        (await AcceptAsync(Dani, request.Id)).IsSuccess.ShouldBeTrue();
+
+        _follows.Items.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Only_who_receives_a_request_can_answer_it_and_only_who_sent_it_can_cancel_it()
+    {
+        var request = AddRequest(Ana, Dani);
+
+        (await AcceptAsync(Ana, request.Id)).Error.ShouldBe(SocialErrors.RequestNotFound);
+        (await AcceptAsync(Carlos, request.Id)).Error.ShouldBe(SocialErrors.RequestNotFound);
+        (await RejectAsync(Carlos, request.Id)).Error.ShouldBe(SocialErrors.RequestNotFound);
+        (await CancelAsync(Dani, request.Id)).Error.ShouldBe(SocialErrors.RequestNotFound);
+        (await CancelAsync(Ana, request.Id)).IsSuccess.ShouldBeTrue();
+        (await AcceptAsync(Dani, request.Id)).Error.ShouldBe(SocialErrors.RequestNotPending);
+        _follows.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Rejecting_leaves_no_follow_and_can_be_asked_again()
+    {
+        var request = AddRequest(Ana, Dani);
+
+        (await RejectAsync(Dani, request.Id)).IsSuccess.ShouldBeTrue();
+        (await RejectAsync(Dani, request.Id)).IsSuccess.ShouldBeTrue();
+        (await RelationshipAsync(Ana, Dani)).Value.Status.ShouldBe("None");
+
+        (await FollowAsync(Ana, Dani)).Value.Status.ShouldBe("Requested");
     }
 
     [Fact]
     public async Task A_request_that_arrives_while_blocking_cannot_be_accepted_or_seen()
     {
-        var request = FriendRequest.Send(Guid.CreateVersion7(), Bea, Ana, Now);
-        _blocks.Add(UserBlock.Create(Guid.CreateVersion7(), Ana, Bea, Now));
+        var request = FollowRequest.Send(Guid.CreateVersion7(), Bea, Dani, Now);
+        _blocks.Add(UserBlock.Create(Guid.CreateVersion7(), Dani, Bea, Now));
         _requests.Add(request);
 
-        (await AcceptHandler.Handle(new AcceptFriendRequestCommand(Ana, request.Id), Token)).Error.ShouldBe(SocialErrors.RequestNotFound);
-        var received = await new GetFriendRequestsQueryHandler(_requests, _graphs, Summaries).Handle(new GetFriendRequestsQuery(Ana, RequestDirection.Received, null, null), Token);
+        (await AcceptAsync(Dani, request.Id)).Error.ShouldBe(SocialErrors.RequestNotFound);
+        var received = await new GetFollowRequestsQueryHandler(_requests, _graphs, Summaries).Handle(new GetFollowRequestsQuery(Dani, RequestDirection.Received, null, null), Token);
         received.Value.Items.ShouldBeEmpty();
     }
 
     [Fact]
     public async Task Lists_of_requests_are_paged_from_the_most_recent()
     {
-        await SendAsync(Bea, Ana);
+        var handler = new GetFollowRequestsQueryHandler(_requests, _graphs, Summaries);
+        await FollowAsync(Bea, Dani);
         _time.Advance(TimeSpan.FromMinutes(1));
-        await SendAsync(Carlos, Ana);
-        var handler = new GetFriendRequestsQueryHandler(_requests, _graphs, Summaries);
+        await FollowAsync(Carlos, Dani);
 
-        var first = await handler.Handle(new GetFriendRequestsQuery(Ana, RequestDirection.Received, 1, null), Token);
-        var second = await handler.Handle(new GetFriendRequestsQuery(Ana, RequestDirection.Received, 1, first.Value.NextCursor), Token);
+        var first = await handler.Handle(new GetFollowRequestsQuery(Dani, RequestDirection.Received, 1, null), Token);
+        var second = await handler.Handle(new GetFollowRequestsQuery(Dani, RequestDirection.Received, 1, first.Value.NextCursor), Token);
 
         first.Value.Items.Single().User.Id.ShouldBe(Carlos);
+        first.Value.Items.Single().Direction.ShouldBe("Received");
         second.Value.Items.Single().User.Id.ShouldBe(Bea);
         second.Value.NextCursor.ShouldBeNull();
-        (await handler.Handle(new GetFriendRequestsQuery(Ana, RequestDirection.Sent, null, null), Token)).Value.Items.ShouldBeEmpty();
-        (await handler.Handle(new GetFriendRequestsQuery(Ana, RequestDirection.Received, null, "not a cursor"), Token)).Error.ShouldBe(SocialErrors.InvalidCursor);
+        (await handler.Handle(new GetFollowRequestsQuery(Dani, RequestDirection.Sent, null, null), Token)).Value.Items.ShouldBeEmpty();
+        (await handler.Handle(new GetFollowRequestsQuery(Dani, RequestDirection.Received, null, "not a cursor"), Token)).Error.ShouldBe(SocialErrors.InvalidCursor);
     }
 
     [Fact]
-    public async Task Removing_a_friend_ends_it_for_both_and_forgets_their_graphs()
+    public async Task The_relationship_says_what_each_person_can_do()
     {
-        Befriend(Ana, Bea);
-        var handler = new RemoveFriendCommandHandler(_friendships, _graphs, _unitOfWork);
+        (await RelationshipAsync(Ana, Ana)).Value.Status.ShouldBe("Self");
+        (await RelationshipAsync(Ana, Bea)).Value.ShouldBe(new RelationshipDto("None", false, null, null));
 
-        (await handler.Handle(new RemoveFriendCommand(Bea, Ana), Token)).IsSuccess.ShouldBeTrue();
+        await FollowAsync(Bea, Ana);
+        (await RelationshipAsync(Ana, Bea)).Value.ShouldBe(new RelationshipDto("None", true, null, null));
+        (await RelationshipAsync(Bea, Ana)).Value.ShouldBe(new RelationshipDto("Following", false, null, null));
 
-        _friendships.Items.ShouldBeEmpty();
-        _graphs.Invalidated.ShouldBe([Ana, Bea], ignoreOrder: true);
-        (await handler.Handle(new RemoveFriendCommand(Bea, Ana), Token)).Error.ShouldBe(SocialErrors.NotFriends);
+        await FollowAsync(Ana, Bea);
+        (await RelationshipAsync(Ana, Bea)).Value.ShouldBe(new RelationshipDto("Friends", true, null, null));
     }
 
     [Fact]
-    public async Task Blocking_ends_the_friendship_and_the_requests_in_both_directions()
+    public async Task The_relationship_shows_the_requests_of_each_side()
+    {
+        var request = AddRequest(Ana, Dani);
+
+        (await RelationshipAsync(Ana, Dani)).Value.ShouldBe(new RelationshipDto("Requested", false, request.Id, null));
+        (await RelationshipAsync(Dani, Ana)).Value.ShouldBe(new RelationshipDto("None", false, null, request.Id));
+    }
+
+    [Fact]
+    public async Task Who_is_blocked_cannot_tell_that_they_are()
+    {
+        await BlockAsync(Ana, Bea);
+
+        (await RelationshipAsync(Ana, Bea)).Value.Status.ShouldBe("Blocked");
+        (await RelationshipAsync(Bea, Ana)).Error.ShouldBe(SocialErrors.UserNotFound);
+        (await RelationshipAsync(Bea, Guid.CreateVersion7())).Error.ShouldBe(SocialErrors.UserNotFound);
+    }
+
+    [Theory]
+    [InlineData(PeopleList.Friends)]
+    [InlineData(PeopleList.Followers)]
+    [InlineData(PeopleList.Following)]
+    public async Task Only_that_person_and_their_friends_can_see_their_lists(PeopleList list)
     {
         Befriend(Ana, Bea);
-        _requests.Add(FriendRequest.Send(Guid.CreateVersion7(), Carlos, Ana, Now));
+        AddFollow(Carlos, Ana);
+        AddFollow(Ana, Dani);
+
+        (await PeopleAsync(Ana, Ana, list)).IsSuccess.ShouldBeTrue();
+        (await PeopleAsync(Bea, Ana, list)).IsSuccess.ShouldBeTrue();
+        (await PeopleAsync(Carlos, Ana, list)).Error.ShouldBe(SocialErrors.ListsPrivate);
+        (await PeopleAsync(Dani, Ana, list)).Error.ShouldBe(SocialErrors.ListsPrivate);
+    }
+
+    [Theory]
+    [InlineData(PeopleList.Friends)]
+    [InlineData(PeopleList.Followers)]
+    [InlineData(PeopleList.Following)]
+    public async Task With_a_block_or_without_an_account_the_lists_do_not_exist(PeopleList list)
+    {
+        await BlockAsync(Bea, Ana);
+
+        (await PeopleAsync(Ana, Bea, list)).Error.ShouldBe(SocialErrors.UserNotFound);
+        (await PeopleAsync(Bea, Ana, list)).Error.ShouldBe(SocialErrors.UserNotFound);
+        (await PeopleAsync(Ana, Guid.CreateVersion7(), list)).Error.ShouldBe(SocialErrors.UserNotFound);
+    }
+
+    [Fact]
+    public async Task Each_list_has_the_right_people()
+    {
+        Befriend(Ana, Bea);
+        AddFollow(Carlos, Ana);
+        AddFollow(Ana, Dani);
+
+        (await PeopleAsync(Ana, Ana, PeopleList.Friends)).Value.Items.Select(person => person.User.Id).ShouldBe([Bea]);
+        (await PeopleAsync(Ana, Ana, PeopleList.Followers)).Value.Items.Select(person => person.User.Id).ShouldBe([Bea, Carlos], ignoreOrder: true);
+        (await PeopleAsync(Ana, Ana, PeopleList.Following)).Value.Items.Select(person => person.User.Id).ShouldBe([Bea, Dani], ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task A_private_profile_that_you_do_not_follow_shows_only_its_username_in_a_list()
+    {
+        AddFollow(Dani, Ana);
+        AddFollow(Dani, Bea);
+        AddFollow(Bea, Dani);
+
+        var strangerSees = (await PeopleAsync(Ana, Ana, PeopleList.Followers)).Value.Items.Single().User;
+        var followerSees = (await PeopleAsync(Bea, Bea, PeopleList.Followers)).Value.Items.Single().User;
+
+        strangerSees.DisplayName.ShouldBe("dani");
+        strangerSees.City.ShouldBeNull();
+        followerSees.DisplayName.ShouldBe("Name of dani");
+        followerSees.City.ShouldBe("Madrid");
+    }
+
+    [Fact]
+    public async Task An_account_being_deleted_is_left_out_of_the_lists()
+    {
+        Befriend(Ana, Bea);
+        _identity.Users.Remove(Bea);
+
+        (await PeopleAsync(Ana, Ana, PeopleList.Friends)).Value.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Anyone_can_see_the_numbers_even_of_a_private_profile_but_not_with_a_block()
+    {
+        Befriend(Dani, Bea);
+        AddFollow(Carlos, Dani);
+        var handler = new GetCountsQueryHandler(_follows, _identity, _graphs);
+
+        (await handler.Handle(new GetCountsQuery(Ana, Dani), Token)).Value.ShouldBe(new CountsDto(2, 1, 1));
+        (await handler.Handle(new GetCountsQuery(Dani, Dani), Token)).Value.ShouldBe(new CountsDto(2, 1, 1));
+
+        await BlockAsync(Dani, Ana);
+        (await handler.Handle(new GetCountsQuery(Ana, Dani), Token)).Error.ShouldBe(SocialErrors.UserNotFound);
+        (await handler.Handle(new GetCountsQuery(Ana, Guid.CreateVersion7()), Token)).Error.ShouldBe(SocialErrors.UserNotFound);
+    }
+
+    [Fact]
+    public async Task Blocking_removes_the_follows_and_the_requests_in_both_directions_and_ends_one_friendship()
+    {
+        Befriend(Ana, Bea);
+        foreach (var follow in _follows.Items)
+        {
+            follow.ClearDomainEvents();
+        }
+
+        var mine = _follows.Items.Single(follow => follow.FollowerId == Ana);
+        var theirs = _follows.Items.Single(follow => follow.FollowerId == Bea);
+        AddRequest(Carlos, Ana);
+        AddRequest(Ana, Carlos);
 
         await BlockAsync(Ana, Bea);
         await BlockAsync(Ana, Carlos);
 
-        _friendships.Items.ShouldBeEmpty();
+        _follows.Items.ShouldBeEmpty();
         _requests.Items.ShouldBeEmpty();
         _blocks.Items.Count.ShouldBe(2);
+        (mine.DomainEvents.Count + theirs.DomainEvents.Count).ShouldBe(1);
         _graphs.Invalidated.ShouldContain(Bea);
         _graphs.Invalidated.ShouldContain(Carlos);
     }
@@ -237,12 +457,12 @@ public sealed class SocialHandlerTests
     [Fact]
     public async Task You_cannot_block_yourself_or_someone_who_does_not_exist()
     {
-        (await BlockHandler.Handle(new BlockUserCommand(Ana, Ana), Token)).Error.ShouldBe(SocialErrors.CannotTargetSelf);
-        (await BlockHandler.Handle(new BlockUserCommand(Ana, Guid.CreateVersion7()), Token)).Error.ShouldBe(SocialErrors.UserNotFound);
+        (await BlockAsync(Ana, Ana)).Error.ShouldBe(SocialErrors.CannotTargetSelf);
+        (await BlockAsync(Ana, Guid.CreateVersion7())).Error.ShouldBe(SocialErrors.UserNotFound);
     }
 
     [Fact]
-    public async Task Unblocking_does_not_bring_back_the_friendship()
+    public async Task Unblocking_does_not_bring_back_the_follows()
     {
         Befriend(Ana, Bea);
         await BlockAsync(Ana, Bea);
@@ -252,58 +472,17 @@ public sealed class SocialHandlerTests
         (await handler.Handle(new UnblockUserCommand(Ana, Bea), Token)).IsSuccess.ShouldBeTrue();
 
         _blocks.Items.ShouldBeEmpty();
-        _friendships.Items.ShouldBeEmpty();
+        _follows.Items.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task The_relationship_says_what_each_person_can_do()
+    public async Task The_list_of_blocks_shows_the_other_person()
     {
-        (await RelationshipAsync(Ana, Ana)).ShouldBe("Self");
-        (await RelationshipAsync(Ana, Bea)).ShouldBe("None");
-
-        var request = (await SendAsync(Ana, Bea)).Value.Request;
-        var sent = await RelationshipHandler.Handle(new GetRelationshipQuery(Ana, Bea), Token);
-        var received = await RelationshipHandler.Handle(new GetRelationshipQuery(Bea, Ana), Token);
-        sent.Value.ShouldBe(new RelationshipDto("RequestSent", request.Id));
-        received.Value.ShouldBe(new RelationshipDto("RequestReceived", request.Id));
-
-        await AcceptHandler.Handle(new AcceptFriendRequestCommand(Bea, request.Id), Token);
-        (await RelationshipAsync(Ana, Bea)).ShouldBe("Friends");
-        (await RelationshipAsync(Bea, Ana)).ShouldBe("Friends");
-    }
-
-    [Fact]
-    public async Task Who_is_blocked_cannot_tell_that_they_are()
-    {
-        await BlockAsync(Ana, Bea);
-
-        (await RelationshipAsync(Ana, Bea)).ShouldBe("Blocked");
-        (await RelationshipHandler.Handle(new GetRelationshipQuery(Bea, Ana), Token)).Error.ShouldBe(SocialErrors.UserNotFound);
-        (await RelationshipHandler.Handle(new GetRelationshipQuery(Bea, Guid.CreateVersion7()), Token)).Error.ShouldBe(SocialErrors.UserNotFound);
-    }
-
-    [Fact]
-    public async Task Lists_of_friends_and_blocks_show_the_other_person()
-    {
-        Befriend(Ana, Bea);
         await BlockAsync(Ana, Carlos);
 
-        var friends = await new GetFriendsQueryHandler(_friendships, _graphs, Summaries).Handle(new GetFriendsQuery(Ana, null, null), Token);
         var blocked = await new GetBlocksQueryHandler(_blocks, Summaries).Handle(new GetBlocksQuery(Ana, null, null), Token);
 
-        friends.Value.Items.Single().User.Id.ShouldBe(Bea);
         blocked.Value.Items.Single().User.Id.ShouldBe(Carlos);
-    }
-
-    [Fact]
-    public async Task An_account_being_deleted_is_left_out_of_the_lists()
-    {
-        Befriend(Ana, Bea);
-        _identity.Users.Remove(Bea);
-
-        var friends = await new GetFriendsQueryHandler(_friendships, _graphs, Summaries).Handle(new GetFriendsQuery(Ana, null, null), Token);
-
-        friends.Value.Items.ShouldBeEmpty();
     }
 
     [Fact]
@@ -332,53 +511,74 @@ public sealed class SocialHandlerTests
     }
 
     [Fact]
+    public async Task A_profile_that_becomes_public_accepts_who_was_waiting()
+    {
+        var pending = AddRequest(Ana, Dani);
+        var answered = AddRequest(Bea, Dani);
+        answered.Reject(Now);
+        var other = AddRequest(Carlos, Ana);
+        var consumer = new AcceptRequestsOnProfilePublic(_requests, Service, _graphs, _unitOfWork, _time);
+
+        await consumer.Handle(new UserPrivacyChanged(Dani, IsPrivate: false, Now), Token);
+
+        pending.Status.ShouldBe(FollowRequestStatus.Accepted);
+        answered.Status.ShouldBe(FollowRequestStatus.Rejected);
+        other.Status.ShouldBe(FollowRequestStatus.Pending);
+        _follows.Items.Single().FollowerId.ShouldBe(Ana);
+        _graphs.Invalidated.ShouldContain(Ana);
+    }
+
+    [Fact]
+    public async Task A_profile_that_becomes_private_keeps_its_requests_and_followers()
+    {
+        var pending = AddRequest(Ana, Dani);
+        AddFollow(Bea, Dani);
+        var consumer = new AcceptRequestsOnProfilePublic(_requests, Service, _graphs, _unitOfWork, _time);
+
+        await consumer.Handle(new UserPrivacyChanged(Dani, IsPrivate: true, Now), Token);
+
+        pending.Status.ShouldBe(FollowRequestStatus.Pending);
+        _follows.Items.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Deleting_an_account_erases_all_that_links_it_to_other_people()
     {
         Befriend(Ana, Bea);
         Befriend(Bea, Carlos);
-        _requests.Add(FriendRequest.Send(Guid.CreateVersion7(), Carlos, Ana, Now));
+        AddRequest(Carlos, Ana);
         _blocks.Add(UserBlock.Create(Guid.CreateVersion7(), Ana, Carlos, Now));
         _reports.Add(Report.Create(Guid.CreateVersion7(), Ana, ReportTargetType.User, Carlos, ReportReason.Spam, null, Now));
         _reports.Add(Report.Create(Guid.CreateVersion7(), Carlos, ReportTargetType.User, Ana, ReportReason.Spam, null, Now));
 
-        await new DeleteSocialDataOnUserDeleted(_requests, _friendships, _blocks, _reports).Handle(new UserDeleted(Ana, Now), Token);
+        await new DeleteSocialDataOnUserDeleted(_requests, _follows, _blocks, _reports).Handle(new UserDeleted(Ana, Now), Token);
 
-        _friendships.Items.Single().OtherThan(Bea).ShouldBe(Carlos);
+        _follows.Items.Count.ShouldBe(2);
+        _follows.Items.ShouldAllBe(follow => follow.FollowerId != Ana && follow.FolloweeId != Ana);
         _requests.Items.ShouldBeEmpty();
         _blocks.Items.ShouldBeEmpty();
         _reports.Items.ShouldBeEmpty();
     }
 
-    [Theory]
-    [InlineData("Self")]
-    [InlineData("Friend")]
-    [InlineData("None")]
-    [InlineData("Blocked")]
-    public async Task The_api_for_other_modules_answers_each_relationship(string expected)
+    [Fact]
+    public async Task The_api_for_other_modules_answers_each_relationship()
     {
-        var target = Bea;
-        switch (expected)
-        {
-            case "Self":
-                target = Ana;
-                break;
-            case "Friend":
-                Befriend(Ana, Bea);
-                break;
-            case "Blocked":
-                _blocks.Add(UserBlock.Create(Guid.CreateVersion7(), Bea, Ana, Now));
-                break;
-        }
+        Befriend(Ana, Bea);
+        AddFollow(Ana, Carlos);
+        _blocks.Add(UserBlock.Create(Guid.CreateVersion7(), Dani, Ana, Now));
+        var api = new RelationshipsApi(_graphs);
 
-        var answer = await new RelationshipsApi(_graphs).GetRelationshipAsync(Ana, target, Token);
-
-        answer.ToString().ShouldBe(expected);
+        (await api.GetRelationshipAsync(Ana, Ana, Token)).ShouldBe(Relationship.Self);
+        (await api.GetRelationshipAsync(Ana, Bea, Token)).ShouldBe(Relationship.Friend);
+        (await api.GetRelationshipAsync(Ana, Carlos, Token)).ShouldBe(Relationship.Follower);
+        (await api.GetRelationshipAsync(Carlos, Ana, Token)).ShouldBe(Relationship.None);
+        (await api.GetRelationshipAsync(Ana, Dani, Token)).ShouldBe(Relationship.Blocked);
     }
 
     [Fact]
-    public async Task A_block_wins_over_a_friendship_and_hides_people_in_both_directions()
+    public async Task A_block_wins_over_a_follow_and_hides_people_in_both_directions()
     {
-        // A friendship accepted just while blocking.
+        // A follow accepted just while blocking.
         Befriend(Ana, Bea);
         _blocks.Add(UserBlock.Create(Guid.CreateVersion7(), Ana, Bea, Now));
         _blocks.Add(UserBlock.Create(Guid.CreateVersion7(), Carlos, Ana, Now));
@@ -386,6 +586,7 @@ public sealed class SocialHandlerTests
 
         (await api.GetRelationshipAsync(Ana, Bea, Token)).ShouldBe(Relationship.Blocked);
         (await api.GetHiddenUserIdsAsync(Ana, Token)).ShouldBe([Bea, Carlos], ignoreOrder: true);
+        (await api.GetFollowingIdsAsync(Ana, Token)).ShouldBe([Bea]);
     }
 
     [Fact]
@@ -396,7 +597,7 @@ public sealed class SocialHandlerTests
         // HybridCache writes it with the default options of System.Text.Json.
         var copy = System.Text.Json.JsonSerializer.Deserialize<SocialGraph>(System.Text.Json.JsonSerializer.Serialize(graph))!;
 
-        copy.Friends.ShouldBe([Ana]);
+        copy.Following.ShouldBe([Ana]);
         copy.IsBlockedEitherWay(Bea).ShouldBeTrue();
         copy.IsBlockedEitherWay(Carlos).ShouldBeTrue();
         copy.IsBlockedEitherWay(Ana).ShouldBeFalse();
@@ -409,6 +610,5 @@ public sealed class SocialHandlerTests
         new CreateReportCommandValidator().Validate(new CreateReportCommand(Ana, "Post", Bea, "Spam", null)).IsValid.ShouldBeFalse();
         new CreateReportCommandValidator().Validate(new CreateReportCommand(Ana, "User", Bea, "Rude", null)).IsValid.ShouldBeFalse();
         new CreateReportCommandValidator().Validate(new CreateReportCommand(Ana, "User", Bea, "Spam", new string('x', Report.DetailsMaxLength + 1))).IsValid.ShouldBeFalse();
-        new SendFriendRequestCommandValidator().Validate(new SendFriendRequestCommand(Ana, Guid.Empty)).IsValid.ShouldBeFalse();
     }
 }

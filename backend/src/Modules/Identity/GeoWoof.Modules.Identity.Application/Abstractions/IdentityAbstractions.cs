@@ -22,8 +22,11 @@ public interface IUserRepository
     /// <summary>Those accounts that exist and have finished the onboarding.</summary>
     Task<IReadOnlyList<User>> GetPublicByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
 
-    /// <summary>The accounts that match the text, from the best match to the worst, after a position.</summary>
-    Task<IReadOnlyList<RelevancePosition>> SearchAsync(string text, IReadOnlyCollection<Guid> excludedIds, RelevancePosition after, int take, CancellationToken cancellationToken);
+    /// <summary>
+    /// The accounts that match the text, from the best match to the worst, after a position. A private
+    /// profile is only found by its name if it is among <paramref name="followedIds"/>.
+    /// </summary>
+    Task<IReadOnlyList<RelevancePosition>> SearchAsync(string text, IReadOnlyCollection<Guid> excludedIds, IReadOnlyCollection<Guid> followedIds, RelevancePosition after, int take, CancellationToken cancellationToken);
 
     void Add(User user);
 

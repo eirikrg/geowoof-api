@@ -4,11 +4,17 @@ namespace GeoWoof.BuildingBlocks.Domain.Visibility;
 public enum ViewerRelation
 {
     Owner = 0,
+
+    /// <summary>They follow each other.</summary>
     Friend = 1,
-    Stranger = 2,
+
+    /// <summary>The viewer follows the owner, who does not follow back.</summary>
+    Follower = 2,
+
+    Stranger = 3,
 
     /// <summary>One of them blocked the other, in either direction.</summary>
-    Blocked = 3,
+    Blocked = 4,
 }
 
 /// <summary>Who the owner of something chose to show it to.</summary>
@@ -19,18 +25,26 @@ public enum ContentVisibility
     OnlyMe = 2,
 }
 
-/// <summary>The only place that decides who sees what (docs/api.md, phase 4). A block wins over everything else.</summary>
+/// <summary>The only place that decides who sees what (docs/api.md, phase 5). A block wins over everything else.</summary>
 public static class VisibilityRules
 {
-    public static bool CanSee(ViewerRelation viewer, ContentVisibility visibility) => viewer switch
+    /// <summary>A private profile only shows its content to those who follow it.</summary>
+    public static bool CanSeeProfileContent(ViewerRelation viewer, bool isPrivateProfile) => viewer switch
     {
-        ViewerRelation.Owner => true,
-        ViewerRelation.Friend => visibility is ContentVisibility.Everyone or ContentVisibility.Friends,
-        ViewerRelation.Stranger => visibility is ContentVisibility.Everyone,
-        _ => false,
+        ViewerRelation.Blocked => false,
+        ViewerRelation.Stranger => !isPrivateProfile,
+        _ => true,
     };
 
+    public static bool CanSee(ViewerRelation viewer, ContentVisibility visibility, bool isPrivateProfile) =>
+        CanSeeProfileContent(viewer, isPrivateProfile) && viewer switch
+        {
+            ViewerRelation.Owner => true,
+            ViewerRelation.Friend => visibility is ContentVisibility.Everyone or ContentVisibility.Friends,
+            _ => visibility is ContentVisibility.Everyone,
+        };
+
     /// <summary>The same rule for a query, which filters by the visibilities that this viewer can see.</summary>
-    public static IReadOnlyList<ContentVisibility> VisibleTo(ViewerRelation viewer) =>
-        Enum.GetValues<ContentVisibility>().Where(visibility => CanSee(viewer, visibility)).ToList();
+    public static IReadOnlyList<ContentVisibility> VisibleTo(ViewerRelation viewer, bool isPrivateProfile) =>
+        Enum.GetValues<ContentVisibility>().Where(visibility => CanSee(viewer, visibility, isPrivateProfile)).ToList();
 }

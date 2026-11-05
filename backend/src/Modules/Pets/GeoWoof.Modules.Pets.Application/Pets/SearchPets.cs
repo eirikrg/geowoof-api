@@ -52,6 +52,15 @@ internal sealed class SearchPetsQueryHandler(IPetRepository pets, IIdentityApi i
 
         var found = (await pets.GetByIdsAsync(page.Select(hit => hit.Id).ToList(), cancellationToken)).ToDictionary(pet => pet.Id);
         var owners = await identity.GetPublicUsersAsync(found.Values.Select(pet => pet.OwnerId).Distinct().ToList(), cancellationToken);
+
+        // The pets of a private profile are only for those who follow it. Being a few, they are left out here
+        // and not in the query, which does not know who has a private profile: a page can come with fewer results.
+        var following = await relationships.GetFollowingIdsAsync(query.ViewerId, cancellationToken);
+        foreach (var privateOwner in owners.Values.Where(owner => owner.IsPrivate && !following.Contains(owner.Id)).ToList())
+        {
+            found = found.Where(pair => pair.Value.OwnerId != privateOwner.Id).ToDictionary();
+        }
+
         var assetIds = found.Values.Select(pet => pet.AvatarAssetId).Concat(owners.Values.Select(owner => owner.AvatarAssetId)).OfType<Guid>().ToList();
         var images = await media.GetImagesAsync(assetIds, cancellationToken);
 

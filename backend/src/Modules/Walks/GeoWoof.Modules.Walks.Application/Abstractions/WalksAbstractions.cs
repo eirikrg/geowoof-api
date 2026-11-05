@@ -39,7 +39,8 @@ public interface IWalkRepository
     /// <summary>The routes of those walks, which lists do not load unless the route has to be cut for someone else.</summary>
     Task<IReadOnlyDictionary<Guid, IReadOnlyList<WalkSegment>>> GetTracksAsync(IReadOnlyCollection<Guid> walkIds, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<WalkStatsRow>> GetStatsRowsAsync(Guid ownerId, Guid? petId, CancellationToken cancellationToken);
+    /// <summary>Only with the given visibilities; <c>null</c> for all of them.</summary>
+    Task<IReadOnlyList<WalkStatsRow>> GetStatsRowsAsync(Guid ownerId, Guid? petId, IReadOnlyCollection<ContentVisibility>? visibilities, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<Walk>> GetByOwnerAsync(Guid ownerId, CancellationToken cancellationToken);
 

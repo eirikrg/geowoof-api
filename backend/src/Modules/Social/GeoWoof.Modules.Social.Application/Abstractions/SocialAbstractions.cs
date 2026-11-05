@@ -14,32 +14,50 @@ public enum RequestDirection
     Sent = 1,
 }
 
-public interface IFriendRequestRepository
+public enum PeopleList
 {
-    Task<FriendRequest?> GetByIdAsync(Guid requestId, CancellationToken cancellationToken);
-
-    Task<FriendRequest?> GetPendingBetweenAsync(Guid first, Guid second, CancellationToken cancellationToken);
-
-    Task<IReadOnlyList<FriendRequest>> GetPendingPageAsync(Guid userId, RequestDirection direction, SocialPosition? after, int take, CancellationToken cancellationToken);
-
-    Task<IReadOnlyList<FriendRequest>> GetAllOfUserAsync(Guid userId, CancellationToken cancellationToken);
-
-    void Add(FriendRequest request);
-
-    void Remove(FriendRequest request);
+    Friends = 0,
+    Followers = 1,
+    Following = 2,
 }
 
-public interface IFriendshipRepository
+/// <summary>A person in a list, with when the relationship started. <paramref name="Id"/> keeps the order stable.</summary>
+public sealed record PersonRow(Guid UserId, DateTimeOffset Since, Guid Id);
+
+public sealed record SocialCounts(int Followers, int Following, int Friends);
+
+public interface IFollowRepository
 {
-    Task<Friendship?> GetBetweenAsync(Guid first, Guid second, CancellationToken cancellationToken);
+    Task<Follow?> GetAsync(Guid followerId, Guid followeeId, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<Friendship>> GetPageAsync(Guid userId, SocialPosition? after, int take, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PersonRow>> GetPageAsync(Guid userId, PeopleList list, SocialPosition? after, int take, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<Friendship>> GetAllOfUserAsync(Guid userId, CancellationToken cancellationToken);
+    Task<SocialCounts> GetCountsAsync(Guid userId, CancellationToken cancellationToken);
 
-    void Add(Friendship friendship);
+    /// <summary>In both directions.</summary>
+    Task<IReadOnlyList<Follow>> GetAllOfUserAsync(Guid userId, CancellationToken cancellationToken);
 
-    void Remove(Friendship friendship);
+    void Add(Follow follow);
+
+    void Remove(Follow follow);
+}
+
+public interface IFollowRequestRepository
+{
+    Task<FollowRequest?> GetByIdAsync(Guid requestId, CancellationToken cancellationToken);
+
+    Task<FollowRequest?> GetPendingAsync(Guid requesterId, Guid targetId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<FollowRequest>> GetPendingPageAsync(Guid userId, RequestDirection direction, SocialPosition? after, int take, CancellationToken cancellationToken);
+
+    /// <summary>All those waiting for an answer from this person.</summary>
+    Task<IReadOnlyList<FollowRequest>> GetAllPendingForAsync(Guid targetId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<FollowRequest>> GetAllOfUserAsync(Guid userId, CancellationToken cancellationToken);
+
+    void Add(FollowRequest request);
+
+    void Remove(FollowRequest request);
 }
 
 public interface IUserBlockRepository
@@ -68,9 +86,12 @@ public interface IReportRepository
     void Remove(Report report);
 }
 
-/// <summary>Who a person is connected to. It changes rarely and is read in almost every request.</summary>
+/// <summary>
+/// What a person has decided about others. It changes rarely and is read in almost every request.
+/// Their followers are not here: someone can have many, and what a viewer needs is in the graph of each of them.
+/// </summary>
 [ImmutableObject(true)]
-public sealed record SocialGraph(IReadOnlyList<Guid> Friends, IReadOnlyList<Guid> Blocked, IReadOnlyList<Guid> BlockedBy)
+public sealed record SocialGraph(IReadOnlyList<Guid> Following, IReadOnlyList<Guid> Blocked, IReadOnlyList<Guid> BlockedBy)
 {
     public bool IsBlockedEitherWay(Guid userId) => Blocked.Contains(userId) || BlockedBy.Contains(userId);
 }

@@ -3,7 +3,7 @@ using GeoWoof.BuildingBlocks.Domain.Results;
 
 namespace GeoWoof.Modules.Social.Domain;
 
-public enum FriendRequestStatus
+public enum FollowRequestStatus
 {
     Pending = 0,
     Accepted = 1,
@@ -11,99 +11,134 @@ public enum FriendRequestStatus
     Cancelled = 3,
 }
 
-public sealed record FriendRequestSentDomainEvent(Guid RequestId, Guid RequesterId, Guid AddresseeId) : IDomainEvent;
+public sealed record UserFollowedDomainEvent(Guid FollowerId, Guid FolloweeId) : IDomainEvent;
 
-public sealed record FriendRequestAcceptedDomainEvent(Guid RequestId, Guid RequesterId, Guid AddresseeId) : IDomainEvent;
+public sealed record FollowRequestedDomainEvent(Guid RequestId, Guid RequesterId, Guid TargetId) : IDomainEvent;
+
+public sealed record FollowRequestAcceptedDomainEvent(Guid RequestId, Guid RequesterId, Guid TargetId) : IDomainEvent;
+
+public sealed record FriendshipStartedDomainEvent(Guid UserAId, Guid UserBId) : IDomainEvent;
 
 public sealed record FriendshipRemovedDomainEvent(Guid UserAId, Guid UserBId) : IDomainEvent;
 
 public sealed record UserBlockedDomainEvent(Guid BlockerId, Guid BlockedId) : IDomainEvent;
 
-/// <summary>An unordered pair of people, stored always in the same order so that a database index can make it unique.</summary>
-public readonly record struct UserPair
+/// <summary>
+/// One person follows another. Two people who follow each other are friends: that is not stored,
+/// so there is no second truth to keep in step.
+/// </summary>
+public sealed class Follow : AggregateRoot
 {
-    public UserPair(Guid first, Guid second)
+    /// <summary>Constructor for EF Core.</summary>
+    private Follow()
     {
-        Low = first.CompareTo(second) < 0 ? first : second;
-        High = first.CompareTo(second) < 0 ? second : first;
     }
 
-    public Guid Low { get; }
+    private Follow(Guid id, Guid followerId, Guid followeeId, DateTimeOffset now)
+        : base(id)
+    {
+        FollowerId = followerId;
+        FolloweeId = followeeId;
+        CreatedAt = now;
+    }
 
-    public Guid High { get; }
+    public Guid FollowerId { get; private set; }
+
+    public Guid FolloweeId { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    /// <param name="id">The id of the new row.</param>
+    /// <param name="followerId">Who follows.</param>
+    /// <param name="followeeId">Who is followed.</param>
+    /// <param name="theyFollowBack">Whether the other person already follows the follower: they become friends.</param>
+    /// <param name="now">The current time.</param>
+    public static Follow Start(Guid id, Guid followerId, Guid followeeId, bool theyFollowBack, DateTimeOffset now)
+    {
+        var follow = new Follow(id, followerId, followeeId, now);
+        follow.Raise(new UserFollowedDomainEvent(followerId, followeeId));
+        if (theyFollowBack)
+        {
+            follow.Raise(new FriendshipStartedDomainEvent(followerId, followeeId));
+        }
+
+        return follow;
+    }
+
+    /// <summary>Marks it for removal; the repository removes it in the same unit of work.</summary>
+    /// <param name="theyFollowBack">Whether the other person follows back: they stop being friends.</param>
+    public void End(bool theyFollowBack)
+    {
+        if (theyFollowBack)
+        {
+            Raise(new FriendshipRemovedDomainEvent(FollowerId, FolloweeId));
+        }
+    }
 }
 
 /// <summary>
-/// One person asks another to be friends. It only goes from <see cref="FriendRequestStatus.Pending"/>
+/// Someone asks to follow a private profile. It only goes from <see cref="FollowRequestStatus.Pending"/>
 /// to one of the others, and repeating the same answer succeeds, in case the first response was lost.
 /// </summary>
-public sealed class FriendRequest : AggregateRoot
+public sealed class FollowRequest : AggregateRoot
 {
     /// <summary>Constructor for EF Core.</summary>
-    private FriendRequest()
+    private FollowRequest()
     {
     }
 
-    private FriendRequest(Guid id, Guid requesterId, Guid addresseeId, DateTimeOffset now)
+    private FollowRequest(Guid id, Guid requesterId, Guid targetId, DateTimeOffset now)
         : base(id)
     {
-        var pair = new UserPair(requesterId, addresseeId);
         RequesterId = requesterId;
-        AddresseeId = addresseeId;
-        UserLowId = pair.Low;
-        UserHighId = pair.High;
-        Status = FriendRequestStatus.Pending;
+        TargetId = targetId;
+        Status = FollowRequestStatus.Pending;
         CreatedAt = now;
     }
 
     public Guid RequesterId { get; private set; }
 
-    public Guid AddresseeId { get; private set; }
+    public Guid TargetId { get; private set; }
 
-    /// <summary>With <see cref="UserHighId"/>, the key of the only pending request between two people.</summary>
-    public Guid UserLowId { get; private set; }
-
-    public Guid UserHighId { get; private set; }
-
-    public FriendRequestStatus Status { get; private set; }
+    public FollowRequestStatus Status { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset? RespondedAt { get; private set; }
 
-    public static FriendRequest Send(Guid id, Guid requesterId, Guid addresseeId, DateTimeOffset now)
+    public static FollowRequest Send(Guid id, Guid requesterId, Guid targetId, DateTimeOffset now)
     {
-        var request = new FriendRequest(id, requesterId, addresseeId, now);
-        request.Raise(new FriendRequestSentDomainEvent(id, requesterId, addresseeId));
+        var request = new FollowRequest(id, requesterId, targetId, now);
+        request.Raise(new FollowRequestedDomainEvent(id, requesterId, targetId));
         return request;
     }
 
-    public Guid OtherThan(Guid userId) => userId == RequesterId ? AddresseeId : RequesterId;
+    public Guid OtherThan(Guid userId) => userId == RequesterId ? TargetId : RequesterId;
 
     public Result Accept(DateTimeOffset now)
     {
-        var wasPending = Status == FriendRequestStatus.Pending;
-        var result = MoveTo(FriendRequestStatus.Accepted, now);
+        var wasPending = Status == FollowRequestStatus.Pending;
+        var result = MoveTo(FollowRequestStatus.Accepted, now);
         if (wasPending && result.IsSuccess)
         {
-            Raise(new FriendRequestAcceptedDomainEvent(Id, RequesterId, AddresseeId));
+            Raise(new FollowRequestAcceptedDomainEvent(Id, RequesterId, TargetId));
         }
 
         return result;
     }
 
-    public Result Reject(DateTimeOffset now) => MoveTo(FriendRequestStatus.Rejected, now);
+    public Result Reject(DateTimeOffset now) => MoveTo(FollowRequestStatus.Rejected, now);
 
-    public Result Cancel(DateTimeOffset now) => MoveTo(FriendRequestStatus.Cancelled, now);
+    public Result Cancel(DateTimeOffset now) => MoveTo(FollowRequestStatus.Cancelled, now);
 
-    private Result MoveTo(FriendRequestStatus status, DateTimeOffset now)
+    private Result MoveTo(FollowRequestStatus status, DateTimeOffset now)
     {
         if (Status == status)
         {
             return Result.Success();
         }
 
-        if (Status != FriendRequestStatus.Pending)
+        if (Status != FollowRequestStatus.Pending)
         {
             return SocialErrors.RequestNotPending;
         }
@@ -112,36 +147,6 @@ public sealed class FriendRequest : AggregateRoot
         RespondedAt = now;
         return Result.Success();
     }
-}
-
-/// <summary>Two people are friends. There is one row per pair, whoever asked.</summary>
-public sealed class Friendship : AggregateRoot
-{
-    /// <summary>Constructor for EF Core.</summary>
-    private Friendship()
-    {
-    }
-
-    private Friendship(Guid id, UserPair pair, DateTimeOffset now)
-        : base(id)
-    {
-        UserAId = pair.Low;
-        UserBId = pair.High;
-        CreatedAt = now;
-    }
-
-    public Guid UserAId { get; private set; }
-
-    public Guid UserBId { get; private set; }
-
-    public DateTimeOffset CreatedAt { get; private set; }
-
-    public static Friendship Between(Guid id, Guid first, Guid second, DateTimeOffset now) => new(id, new UserPair(first, second), now);
-
-    public Guid OtherThan(Guid userId) => userId == UserAId ? UserBId : UserAId;
-
-    /// <summary>Marks the friendship for removal; the repository removes it in the same unit of work.</summary>
-    public void End() => Raise(new FriendshipRemovedDomainEvent(UserAId, UserBId));
 }
 
 /// <summary>One person blocked another. It hides each of them from the other, in both directions.</summary>

@@ -150,7 +150,7 @@ public sealed class Walk : AggregateRoot
             && _pets.TrueForAll(pet => petIds.Contains(pet.PetId));
     }
 
-    public bool IsVisibleTo(ViewerRelation viewer) => VisibilityRules.CanSee(viewer, Visibility);
+    public bool IsVisibleTo(ViewerRelation viewer, bool isPrivateProfile) => VisibilityRules.CanSee(viewer, Visibility, isPrivateProfile);
 
     /// <summary>The last edit wins: an older one, delivered late, must be ignored.</summary>
     public bool IsStale(DateTimeOffset updatedAt) => updatedAt < UpdatedAt;

@@ -55,7 +55,8 @@ internal sealed class UpdateProfileCommandHandler(IUserRepository users, IIdenti
 }
 
 /// <summary>Claims the @username (completes onboarding the first time).</summary>
-public sealed record ChangeUsernameCommand(Guid UserId, string Username) : ICommand<UserDto>;
+/// <summary>Changes the username. When creating the account, it also chooses whether the profile is private.</summary>
+public sealed record ChangeUsernameCommand(Guid UserId, string Username, bool? IsPrivate = null) : ICommand<UserDto>;
 
 internal sealed class ChangeUsernameCommandValidator : AbstractValidator<ChangeUsernameCommand>
 {
@@ -79,17 +80,17 @@ internal sealed class ChangeUsernameCommandHandler(IUserRepository users, IIdent
             return IdentityErrors.AccountNotFound;
         }
 
-        if (user.Username == username.Value)
-        {
-            return UserDto.From(user);
-        }
-
-        if (await users.UsernameExistsAsync(username.Value, cancellationToken))
+        if (user.Username != username.Value && await users.UsernameExistsAsync(username.Value, cancellationToken))
         {
             return IdentityErrors.UsernameTaken;
         }
 
         user.ChangeUsername(username.Value);
+        if (command.IsPrivate is { } isPrivate)
+        {
+            user.SetPrivate(isPrivate);
+        }
+
         try
         {
             await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -99,6 +100,26 @@ internal sealed class ChangeUsernameCommandHandler(IUserRepository users, IIdent
             return IdentityErrors.UsernameTaken;
         }
 
+        return UserDto.From(user);
+    }
+}
+
+/// <summary>Makes the profile public or private. Those waiting to follow a profile that becomes public are accepted.</summary>
+public sealed record ChangePrivacyCommand(Guid UserId, bool IsPrivate) : ICommand<UserDto>;
+
+internal sealed class ChangePrivacyCommandHandler(IUserRepository users, IIdentityUnitOfWork unitOfWork)
+    : ICommandHandler<ChangePrivacyCommand, UserDto>
+{
+    public async Task<Result<UserDto>> Handle(ChangePrivacyCommand command, CancellationToken cancellationToken)
+    {
+        var user = await users.GetByIdAsync(command.UserId, cancellationToken);
+        if (user is null)
+        {
+            return IdentityErrors.AccountNotFound;
+        }
+
+        user.SetPrivate(command.IsPrivate);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
         return UserDto.From(user);
     }
 }

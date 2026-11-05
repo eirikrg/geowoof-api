@@ -30,12 +30,13 @@ internal sealed class IdentityDevelopmentSeeder(IdentityDbContext dbContext, IPa
 {
     public const string Password = "GeoWoof2026";
 
-    private static readonly (string Email, string Username, string DisplayName, Language Language)[] SampleUsers =
+    private static readonly (string Email, string Username, string DisplayName, Language Language, bool IsPrivate)[] SampleUsers =
     [
-        ("ana@geowoof.dev", "ana", "Ana", Language.Es),
-        ("bea@geowoof.dev", "bea", "Bea", Language.Es),
-        ("carlos@geowoof.dev", "carlos", "Carlos", Language.En),
-        ("jose@geowoof.dev", "jose_angel", "José Ángel", Language.Es),
+        ("ana@geowoof.dev", "ana", "Ana", Language.Es, false),
+        ("bea@geowoof.dev", "bea", "Bea", Language.Es, false),
+        ("carlos@geowoof.dev", "carlos", "Carlos", Language.En, false),
+        ("jose@geowoof.dev", "jose_angel", "José Ángel", Language.Es, false),
+        ("dani@geowoof.dev", "dani", "Dani Prieto", Language.Es, true),
     ];
 
     public int Order => 0;
@@ -54,6 +55,7 @@ internal sealed class IdentityDevelopmentSeeder(IdentityDbContext dbContext, IPa
             var user = User.RegisterWithPassword(Guid.CreateVersion7(now), email, passwordHasher.Hash(Password), sample.DisplayName, sample.Language, now);
             user.MarkEmailVerified();
             user.ChangeUsername(Username.FromStorage(sample.Username));
+            user.SetPrivate(sample.IsPrivate);
             dbContext.Users.Add(user);
         }
 

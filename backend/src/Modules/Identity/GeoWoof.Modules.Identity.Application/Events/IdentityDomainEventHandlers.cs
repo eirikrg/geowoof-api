@@ -15,6 +15,16 @@ internal sealed class UserProfileChangedHandler(IIntegrationEventPublisher publi
     }
 }
 
+internal sealed class UserPrivacyChangedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider)
+    : IDomainEventHandler<UserPrivacyChangedDomainEvent>
+{
+    public Task Handle(UserPrivacyChangedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        publisher.Publish(new UserPrivacyChanged(domainEvent.UserId, domainEvent.IsPrivate, timeProvider.GetUtcNow()));
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class UserDeletedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider)
     : IDomainEventHandler<UserDeletedDomainEvent>
 {

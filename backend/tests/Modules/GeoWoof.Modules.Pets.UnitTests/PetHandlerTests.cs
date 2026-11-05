@@ -43,9 +43,39 @@ public sealed class PetHandlerTests
         _identity.Add(Ana, "ana");
         _relationships.Block(anaBlocks ? Ana : Bea, anaBlocks ? Bea : Ana);
 
-        (await new GetPetQueryHandler(_pets, _relationships, _media).Handle(new GetPetQuery(Bea, luna.Id), Token)).Error.ShouldBe(PetsErrors.NotFound);
+        (await new GetPetQueryHandler(_pets, _identity, _relationships, _media).Handle(new GetPetQuery(Bea, luna.Id), Token)).Error.ShouldBe(PetsErrors.NotFound);
         (await new GetUserPetsQueryHandler(_pets, _identity, _relationships, _media).Handle(new GetUserPetsQuery(Bea, Ana), Token)).Error.ShouldBe(PetsErrors.UserNotFound);
-        (await new GetPetQueryHandler(_pets, _relationships, _media).Handle(new GetPetQuery(Ana, luna.Id), Token)).IsSuccess.ShouldBeTrue();
+        (await new GetPetQueryHandler(_pets, _identity, _relationships, _media).Handle(new GetPetQuery(Ana, luna.Id), Token)).IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_private_profile_only_shows_its_pets_to_its_followers()
+    {
+        var luna = await CreateNamedAsync(Ana, "Luna");
+        var follower = Guid.CreateVersion7();
+        _identity.Add(Ana, "ana", isPrivate: true);
+        _relationships.Follow(follower, Ana);
+        var list = new GetUserPetsQueryHandler(_pets, _identity, _relationships, _media);
+        var one = new GetPetQueryHandler(_pets, _identity, _relationships, _media);
+
+        (await list.Handle(new GetUserPetsQuery(Bea, Ana), Token)).Error.ShouldBe(PetsErrors.ProfilePrivate);
+        (await one.Handle(new GetPetQuery(Bea, luna.Id), Token)).Error.ShouldBe(PetsErrors.NotFound);
+        (await list.Handle(new GetUserPetsQuery(follower, Ana), Token)).Value.Items.Count.ShouldBe(1);
+        (await one.Handle(new GetPetQuery(follower, luna.Id), Token)).IsSuccess.ShouldBeTrue();
+        (await list.Handle(new GetUserPetsQuery(Ana, Ana), Token)).Value.Items.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_search_of_pets_only_shows_those_of_a_private_profile_to_its_followers()
+    {
+        await CreateNamedAsync(Ana, "Luna");
+        var follower = Guid.CreateVersion7();
+        _identity.Add(Ana, "ana", isPrivate: true);
+        _relationships.Follow(follower, Ana);
+        var handler = new SearchPetsQueryHandler(_pets, _identity, _relationships, _media);
+
+        (await handler.Handle(new SearchPetsQuery(Bea, "Luna", null, null), Token)).Value.Items.ShouldBeEmpty();
+        (await handler.Handle(new SearchPetsQuery(follower, "Luna", null, null), Token)).Value.Items.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -146,7 +176,7 @@ public sealed class PetHandlerTests
     public async Task The_microchip_is_hidden_from_other_people()
     {
         var created = (await Create().Handle(new CreatePetCommand(Ana, Input() with { Microchip = "941000024567890" }), Token)).Value;
-        var handler = new GetPetQueryHandler(_pets, _relationships, _media);
+        var handler = new GetPetQueryHandler(_pets, _identity, _relationships, _media);
         var list = new GetPetsQueryHandler(_pets, _media);
         var ofUser = new GetUserPetsQueryHandler(_pets, _identity, _relationships, _media);
         _identity.Add(Ana, "ana");
@@ -404,13 +434,15 @@ internal sealed class FakeUnitOfWork : IPetsUnitOfWork
 /// <summary>Who is related to whom, in the tests of a module that only knows the contract of Social.</summary>
 internal sealed class FakeRelationships : IRelationshipsApi
 {
-    private readonly HashSet<(Guid, Guid)> _friends = [];
+    private readonly HashSet<(Guid Follower, Guid Followee)> _follows = [];
     private readonly HashSet<(Guid, Guid)> _blocks = [];
+
+    public void Follow(Guid follower, Guid followee) => _follows.Add((follower, followee));
 
     public void Befriend(Guid first, Guid second)
     {
-        _friends.Add((first, second));
-        _friends.Add((second, first));
+        Follow(first, second);
+        Follow(second, first);
     }
 
     public void Block(Guid blocker, Guid blocked) => _blocks.Add((blocker, blocked));
@@ -427,7 +459,12 @@ internal sealed class FakeRelationships : IRelationshipsApi
             return Task.FromResult(Relationship.Blocked);
         }
 
-        return Task.FromResult(_friends.Contains((viewerId, targetId)) ? Relationship.Friend : Relationship.None);
+        if (!_follows.Contains((viewerId, targetId)))
+        {
+            return Task.FromResult(Relationship.None);
+        }
+
+        return Task.FromResult(_follows.Contains((targetId, viewerId)) ? Relationship.Friend : Relationship.Follower);
     }
 
     public Task<IReadOnlyCollection<Guid>> GetHiddenUserIdsAsync(Guid userId, CancellationToken cancellationToken)
@@ -439,13 +476,19 @@ internal sealed class FakeRelationships : IRelationshipsApi
             .ToList();
         return Task.FromResult(hidden);
     }
+
+    public Task<IReadOnlyCollection<Guid>> GetFollowingIdsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<Guid> following = _follows.Where(follow => follow.Follower == userId).Select(follow => follow.Followee).ToList();
+        return Task.FromResult(following);
+    }
 }
 
 internal sealed class FakeIdentity : IIdentityApi
 {
     public Dictionary<Guid, UserSummary> Users { get; } = [];
 
-    public void Add(Guid id, string username) => Users[id] = new UserSummary(id, username, username, null, null);
+    public void Add(Guid id, string username, bool isPrivate = false) => Users[id] = new UserSummary(id, username, username, null, null, isPrivate);
 
     public Task<Guid?> FindUserIdByEmailAsync(string email, CancellationToken cancellationToken) => Task.FromResult<Guid?>(null);
 

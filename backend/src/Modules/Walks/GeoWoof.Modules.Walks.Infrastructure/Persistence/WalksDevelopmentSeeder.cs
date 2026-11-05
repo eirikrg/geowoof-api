@@ -41,6 +41,7 @@ internal sealed class WalksDevelopmentSeeder(WalksDbContext dbContext, IWalkRepo
         ("bea@geowoof.dev", Retiro, 3, null),
         ("carlos@geowoof.dev", ParqueDelOeste, 4, "Parque del Oeste con Rocky"),
         ("jose@geowoof.dev", ParqueDelOeste, 3, null),
+        ("dani@geowoof.dev", Retiro, 2, null),
     ];
 
     private static readonly ContentVisibility[] SampleVisibilities = [ContentVisibility.Everyone, ContentVisibility.Friends, ContentVisibility.OnlyMe];

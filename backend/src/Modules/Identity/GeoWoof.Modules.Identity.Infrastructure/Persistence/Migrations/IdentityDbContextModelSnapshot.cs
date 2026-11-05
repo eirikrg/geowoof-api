@@ -210,6 +210,10 @@ namespace GeoWoof.Modules.Identity.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("failed_sign_in_attempts");
 
+                    b.Property<bool>("IsPrivate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_private");
+
                     b.Property<string>("Language")
                         .IsRequired()
                         .HasMaxLength(8)

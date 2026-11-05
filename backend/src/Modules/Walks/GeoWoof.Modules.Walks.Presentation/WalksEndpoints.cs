@@ -57,7 +57,10 @@ public static class WalksEndpoints
         walks.MapGet("/walks/{id:guid}", GetWalkAsync).Produces<WalkDto>().ProducesProblem(StatusCodes.Status404NotFound);
         walks.MapDelete("/walks/{id:guid}", DeleteWalkAsync).Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status404NotFound);
         walks.MapGet("/me/walks", GetMyWalksAsync).Produces<PagedResponse<WalkSummaryDto>>();
-        walks.MapGet("/users/{id:guid}/walks", GetUserWalksAsync).Produces<PagedResponse<WalkSummaryDto>>().ProducesProblem(StatusCodes.Status404NotFound);
+        walks.MapGet("/users/{id:guid}/walks", GetUserWalksAsync)
+            .Produces<PagedResponse<WalkSummaryDto>>().ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound);
+        walks.MapGet("/users/{id:guid}/walk-stats", GetUserStatsAsync)
+            .Produces<WalkStatsDto>().ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound);
         walks.MapGet("/me/walk-stats", GetMyStatsAsync).Produces<WalkStatsDto>();
         walks.MapGet("/pets/{id:guid}/walks", GetPetWalksAsync)
             .Produces<PagedResponse<WalkSummaryDto>>().ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound);
@@ -105,6 +108,13 @@ public static class WalksEndpoints
         IQueryHandler<GetUserWalksQuery, PagedResponse<WalkSummaryDto>> handler,
         CancellationToken cancellationToken) =>
         (await handler.Handle(new GetUserWalksQuery(user.GetUserId(), id, limit, cursor), cancellationToken)).ToHttpResult(TypedResults.Ok);
+
+    private static async Task<IResult> GetUserStatsAsync(
+        Guid id,
+        ClaimsPrincipal user,
+        IQueryHandler<GetUserWalkStatsQuery, WalkStatsDto> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new GetUserWalkStatsQuery(user.GetUserId(), id), cancellationToken)).ToHttpResult(TypedResults.Ok);
 
     private static async Task<IResult> GetPetWalksAsync(
         Guid id,

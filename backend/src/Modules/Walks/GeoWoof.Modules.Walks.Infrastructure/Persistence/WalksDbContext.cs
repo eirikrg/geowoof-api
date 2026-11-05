@@ -190,12 +190,17 @@ internal sealed class WalkRepository(WalksDbContext dbContext) : IWalkRepository
             .Select(walk => new { walk.Id, walk.Segments })
             .ToDictionaryAsync(walk => walk.Id, walk => walk.Segments, cancellationToken);
 
-    public async Task<IReadOnlyList<WalkStatsRow>> GetStatsRowsAsync(Guid ownerId, Guid? petId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WalkStatsRow>> GetStatsRowsAsync(Guid ownerId, Guid? petId, IReadOnlyCollection<ContentVisibility>? visibilities, CancellationToken cancellationToken)
     {
         var query = dbContext.Walks.AsNoTracking().Where(walk => walk.OwnerId == ownerId);
         if (petId is { } pet)
         {
             query = query.Where(walk => walk.Pets.Any(walkPet => walkPet.PetId == pet));
+        }
+
+        if (visibilities is not null)
+        {
+            query = query.Where(walk => visibilities.Contains(walk.Visibility));
         }
 
         return await query

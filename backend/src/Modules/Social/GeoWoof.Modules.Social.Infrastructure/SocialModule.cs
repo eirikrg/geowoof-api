@@ -17,14 +17,14 @@ public static class SocialModule
 
         services.AddModuleDbContext<SocialDbContext>(SocialDbContext.SchemaName);
         services.AddScoped<ISocialUnitOfWork>(serviceProvider => serviceProvider.GetRequiredService<SocialDbContext>());
-        services.AddScoped<IFriendRequestRepository, FriendRequestRepository>();
-        services.AddScoped<IFriendshipRepository, FriendshipRepository>();
+        services.AddScoped<IFollowRepository, FollowRepository>();
+        services.AddScoped<IFollowRequestRepository, FollowRequestRepository>();
         services.AddScoped<IUserBlockRepository, UserBlockRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
         services.AddScoped<ISocialGraphStore, SocialGraphStore>();
         services.AddScoped<ISocialGraphCache, HybridSocialGraphCache>();
         services.AddScoped<IDevelopmentDataSeeder, SocialDevelopmentSeeder>();
-        services.AddIntegrationEvents(typeof(FriendRequestSent).Assembly);
+        services.AddIntegrationEvents(typeof(UserFollowed).Assembly);
         services.AddIntegrationEventConsumers<SocialDbContext>(typeof(SocialApplication).Assembly);
         return services;
     }

@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GeoWoof.IntegrationTests.Social;
 
-/// <summary>The phase 4 contract (docs/api.md) end to end: HTTP, handlers, PostgreSQL, the cache in Redis and the Outbox.</summary>
+/// <summary>The contract of phases 4 and 5 (docs/api.md) end to end: HTTP, handlers, PostgreSQL, the cache in Redis and the Outbox.</summary>
 public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
 {
     private static readonly DateTimeOffset Start = new(2026, 11, 2, 8, 0, 0, TimeSpan.Zero);
@@ -28,20 +28,33 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
     private static Task<HttpResponseMessage> DeleteAsync(TestUser user, string path) =>
         user.Client.DeleteAsync(new Uri(path, UriKind.Relative), Token);
 
-    private static async Task BefriendAsync(ApiFactory api, TestUser requester, TestUser addressee)
+    private static async Task<JsonElement> FollowAsync(TestUser follower, TestUser followee)
     {
-        await requester.VerifyEmailAsync(api);
-        using var sent = await requester.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = addressee.Id });
-        sent.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var id = (await sent.JsonAsync()).GetProperty("id").GetGuid();
-        using var accepted = await PostAsync(addressee, $"/api/v1/friend-requests/{id}/accept");
-        accepted.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using var response = await follower.Client.PutJsonAsync($"/api/v1/users/{followee.Id}/follow", new { });
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        return await response.JsonAsync();
+    }
+
+    /// <summary>Whoever follows needs a verified email.</summary>
+    private static async Task BefriendAsync(ApiFactory api, TestUser first, TestUser second)
+    {
+        await first.VerifyEmailAsync(api);
+        await second.VerifyEmailAsync(api);
+        await FollowAsync(first, second);
+        await FollowAsync(second, first);
     }
 
     private static async Task BlockAsync(TestUser blocker, TestUser blocked)
     {
         using var response = await blocker.Client.PutJsonAsync($"/api/v1/blocks/{blocked.Id}", new { });
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    private static async Task MakePrivateAsync(TestUser user, bool isPrivate = true)
+    {
+        using var response = await user.Client.PutJsonAsync("/api/v1/me/privacy", new { isPrivate });
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.JsonAsync()).GetProperty("isPrivate").GetBoolean().ShouldBe(isPrivate);
     }
 
     private static async Task<Guid> CreatePetAsync(TestUser user, string name = "Luna", string? breed = null)
@@ -98,131 +111,304 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
     }
 
     [Fact]
-    public async Task Two_people_become_friends_through_a_request_and_can_stop_being_friends()
-    {
-        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
-        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
-        using var bea = await TestUser.RegisterAsync(api, "bea@example.com");
-        await ana.VerifyEmailAsync(api);
-        (await RelationshipAsync(ana, bea)).ShouldBe("None");
-
-        using var sent = await ana.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = bea.Id });
-
-        sent.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var request = await sent.JsonAsync();
-        var requestId = request.GetProperty("id").GetGuid();
-        request.GetProperty("direction").GetString().ShouldBe("Sent");
-        request.GetProperty("status").GetString().ShouldBe("Pending");
-        request.GetProperty("user").GetProperty("username").GetString().ShouldBe("bea");
-        request.GetProperty("user").TryGetProperty("email", out _).ShouldBeFalse();
-
-        var ofAna = await ana.Client.GetJsonAsync($"/api/v1/users/{bea.Id}/relationship");
-        ofAna.GetProperty("status").GetString().ShouldBe("RequestSent");
-        ofAna.GetProperty("requestId").GetGuid().ShouldBe(requestId);
-        (await RelationshipAsync(bea, ana)).ShouldBe("RequestReceived");
-
-        var received = await bea.Client.GetJsonAsync("/api/v1/friend-requests/received");
-        received.GetProperty("items")[0].GetProperty("user").GetProperty("username").GetString().ShouldBe("ana");
-        received.GetProperty("items")[0].GetProperty("direction").GetString().ShouldBe("Received");
-        (await ana.Client.GetJsonAsync("/api/v1/friend-requests/sent")).GetProperty("items").GetArrayLength().ShouldBe(1);
-        (await ana.Client.GetJsonAsync("/api/v1/friend-requests/received")).GetProperty("items").GetArrayLength().ShouldBe(0);
-
-        using var accepted = await PostAsync(bea, $"/api/v1/friend-requests/{requestId}/accept");
-        accepted.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await accepted.JsonAsync()).GetProperty("status").GetString().ShouldBe("Accepted");
-
-        (await RelationshipAsync(ana, bea)).ShouldBe("Friends");
-        (await RelationshipAsync(bea, ana)).ShouldBe("Friends");
-        var friends = await ana.Client.GetJsonAsync("/api/v1/friends");
-        friends.GetProperty("items")[0].GetProperty("user").GetProperty("id").GetGuid().ShouldBe(bea.Id);
-        (await bea.Client.GetJsonAsync("/api/v1/friend-requests/received")).GetProperty("items").GetArrayLength().ShouldBe(0);
-
-        using var again = await ana.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = bea.Id });
-        again.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        (await CodeAsync(again)).ShouldBe("social.already_friends");
-
-        using var removed = await DeleteAsync(bea, $"/api/v1/friends/{ana.Id}");
-        removed.StatusCode.ShouldBe(HttpStatusCode.NoContent);
-        (await RelationshipAsync(ana, bea)).ShouldBe("None");
-        using var notFriends = await DeleteAsync(bea, $"/api/v1/friends/{ana.Id}");
-        notFriends.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        (await CodeAsync(notFriends)).ShouldBe("social.not_friends");
-
-        using var scope = api.Services.CreateScope();
-        var outbox = await scope.ServiceProvider.GetRequiredService<SocialDbContext>().OutboxMessages
-            .Select(message => message.Type)
-            .ToListAsync(Token);
-        outbox.ShouldBe(["social.friend_request_sent.v1", "social.friend_request_accepted.v1", "social.friendship_removed.v1"], ignoreOrder: true);
-    }
-
-    [Fact]
-    public async Task Sending_a_request_needs_a_verified_email()
-    {
-        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
-        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
-        using var bea = await TestUser.RegisterAsync(api, "bea@example.com");
-
-        using var response = await ana.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = bea.Id });
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        (await CodeAsync(response)).ShouldBe("auth.forbidden");
-    }
-
-    [Fact]
-    public async Task A_request_can_be_rejected_or_cancelled_and_then_sent_again()
-    {
-        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
-        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
-        using var bea = await TestUser.RegisterAsync(api, "bea@example.com");
-        await ana.VerifyEmailAsync(api);
-
-        using var first = await ana.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = bea.Id });
-        var firstId = (await first.JsonAsync()).GetProperty("id").GetGuid();
-        using var repeated = await ana.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = bea.Id });
-        repeated.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await repeated.JsonAsync()).GetProperty("id").GetGuid().ShouldBe(firstId);
-
-        using var strangerAccepts = await PostAsync(ana, $"/api/v1/friend-requests/{firstId}/accept");
-        strangerAccepts.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        (await CodeAsync(strangerAccepts)).ShouldBe("social.request_not_found");
-
-        using var rejected = await PostAsync(bea, $"/api/v1/friend-requests/{firstId}/reject");
-        rejected.StatusCode.ShouldBe(HttpStatusCode.NoContent);
-        using var rejectedAgain = await PostAsync(bea, $"/api/v1/friend-requests/{firstId}/reject");
-        rejectedAgain.StatusCode.ShouldBe(HttpStatusCode.NoContent);
-        (await RelationshipAsync(ana, bea)).ShouldBe("None");
-        using var acceptedTooLate = await PostAsync(bea, $"/api/v1/friend-requests/{firstId}/accept");
-        acceptedTooLate.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        (await CodeAsync(acceptedTooLate)).ShouldBe("social.request_not_pending");
-
-        using var second = await ana.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = bea.Id });
-        second.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var secondId = (await second.JsonAsync()).GetProperty("id").GetGuid();
-        using var cancelled = await DeleteAsync(ana, $"/api/v1/friend-requests/{secondId}");
-        cancelled.StatusCode.ShouldBe(HttpStatusCode.NoContent);
-        (await bea.Client.GetJsonAsync("/api/v1/friend-requests/received")).GetProperty("items").GetArrayLength().ShouldBe(0);
-    }
-
-    [Fact]
-    public async Task Asking_someone_who_had_already_asked_makes_you_friends_at_once()
+    public async Task Two_people_who_follow_each_other_are_friends_until_one_of_them_stops()
     {
         await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
         using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
         using var bea = await TestUser.RegisterAsync(api, "bea@example.com");
         await ana.VerifyEmailAsync(api);
         await bea.VerifyEmailAsync(api);
-        using var sent = await ana.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = bea.Id });
-        sent.StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await RelationshipAsync(ana, bea)).ShouldBe("None");
 
-        using var answer = await bea.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = ana.Id });
+        var followed = await FollowAsync(ana, bea);
 
-        answer.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await answer.JsonAsync()).GetProperty("status").GetString().ShouldBe("Accepted");
+        followed.GetProperty("status").GetString().ShouldBe("Following");
+        followed.GetProperty("followsYou").GetBoolean().ShouldBeFalse();
+        var seenByBea = await bea.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/relationship");
+        seenByBea.GetProperty("status").GetString().ShouldBe("None");
+        seenByBea.GetProperty("followsYou").GetBoolean().ShouldBeTrue();
+        var counts = await bea.Client.GetJsonAsync($"/api/v1/users/{bea.Id}/counts");
+        counts.GetProperty("followers").GetInt32().ShouldBe(1);
+        counts.GetProperty("following").GetInt32().ShouldBe(0);
+        counts.GetProperty("friends").GetInt32().ShouldBe(0);
+
+        var back = await FollowAsync(bea, ana);
+
+        back.GetProperty("status").GetString().ShouldBe("Friends");
         (await RelationshipAsync(ana, bea)).ShouldBe("Friends");
+        (await ana.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/counts")).GetProperty("friends").GetInt32().ShouldBe(1);
+        var friends = await ana.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/friends");
+        var friend = friends.GetProperty("items")[0];
+        friend.GetProperty("user").GetProperty("id").GetGuid().ShouldBe(bea.Id);
+        friend.GetProperty("user").TryGetProperty("email", out _).ShouldBeFalse();
+
+        using var stopped = await DeleteAsync(bea, $"/api/v1/users/{ana.Id}/follow");
+
+        stopped.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await stopped.JsonAsync()).GetProperty("status").GetString().ShouldBe("None");
+        (await RelationshipAsync(ana, bea)).ShouldBe("Following");
+        (await ana.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/friends")).GetProperty("items").GetArrayLength().ShouldBe(0);
+
+        using var scope = api.Services.CreateScope();
+        var outbox = await scope.ServiceProvider.GetRequiredService<SocialDbContext>().OutboxMessages
+            .Select(message => message.Type)
+            .ToListAsync(Token);
+        outbox.ShouldBe(["social.user_followed.v1", "social.user_followed.v1", "social.friendship_started.v1", "social.friendship_removed.v1"], ignoreOrder: true);
     }
 
     [Fact]
-    public async Task Concurrent_requests_between_two_people_leave_one_friendship_at_most()
+    public async Task Following_needs_a_verified_email()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
+        using var bea = await TestUser.RegisterAsync(api, "bea@example.com");
+
+        using var response = await ana.Client.PutJsonAsync($"/api/v1/users/{bea.Id}/follow", new { });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await CodeAsync(response)).ShouldBe("auth.forbidden");
+    }
+
+    [Fact]
+    public async Task Following_a_private_profile_needs_a_yes_and_it_can_be_rejected_or_cancelled()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
+        using var dani = await TestUser.RegisterAsync(api, "dani@example.com");
+        await ana.VerifyEmailAsync(api);
+        await MakePrivateAsync(dani);
+
+        var asked = await FollowAsync(ana, dani);
+
+        asked.GetProperty("status").GetString().ShouldBe("Requested");
+        var requestId = asked.GetProperty("requestId").GetGuid();
+        (await FollowAsync(ana, dani)).GetProperty("requestId").GetGuid().ShouldBe(requestId);
+        var received = await dani.Client.GetJsonAsync("/api/v1/follow-requests/received");
+        received.GetProperty("items")[0].GetProperty("id").GetGuid().ShouldBe(requestId);
+        received.GetProperty("items")[0].GetProperty("direction").GetString().ShouldBe("Received");
+        (await ana.Client.GetJsonAsync("/api/v1/follow-requests/sent")).GetProperty("items").GetArrayLength().ShouldBe(1);
+        (await dani.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/relationship")).GetProperty("incomingRequestId").GetGuid().ShouldBe(requestId);
+
+        using var notYours = await PostAsync(ana, $"/api/v1/follow-requests/{requestId}/accept");
+        notYours.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await CodeAsync(notYours)).ShouldBe("social.request_not_found");
+
+        using var rejected = await PostAsync(dani, $"/api/v1/follow-requests/{requestId}/reject");
+        rejected.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        using var rejectedAgain = await PostAsync(dani, $"/api/v1/follow-requests/{requestId}/reject");
+        rejectedAgain.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await RelationshipAsync(ana, dani)).ShouldBe("None");
+        using var tooLate = await PostAsync(dani, $"/api/v1/follow-requests/{requestId}/accept");
+        tooLate.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await CodeAsync(tooLate)).ShouldBe("social.request_not_pending");
+
+        var second = (await FollowAsync(ana, dani)).GetProperty("requestId").GetGuid();
+        using var cancelled = await DeleteAsync(ana, $"/api/v1/follow-requests/{second}");
+        cancelled.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await dani.Client.GetJsonAsync("/api/v1/follow-requests/received")).GetProperty("items").GetArrayLength().ShouldBe(0);
+
+        await FollowAsync(ana, dani);
+        using var unfollowed = await DeleteAsync(ana, $"/api/v1/users/{dani.Id}/follow");
+        (await unfollowed.JsonAsync()).GetProperty("status").GetString().ShouldBe("None");
+    }
+
+    [Fact]
+    public async Task Accepting_lets_that_person_follow_you_and_see_what_is_for_everyone()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
+        using var dani = await TestUser.RegisterAsync(api, "dani@example.com");
+        await ana.VerifyEmailAsync(api);
+        await MakePrivateAsync(dani);
+        var petId = await CreatePetAsync(dani);
+        await PutWalkAsync(dani, petId, "Everyone");
+        await PutWalkAsync(dani, petId, "Friends", minutesAfterStart: 60);
+        var requestId = (await FollowAsync(ana, dani)).GetProperty("requestId").GetGuid();
+
+        using var denied = await GetAsync(ana, $"/api/v1/users/{dani.Id}/walks");
+        denied.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        using var accepted = await PostAsync(dani, $"/api/v1/follow-requests/{requestId}/accept");
+        accepted.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var answer = await accepted.JsonAsync();
+        answer.GetProperty("status").GetString().ShouldBe("None");
+        answer.GetProperty("followsYou").GetBoolean().ShouldBeTrue();
+
+        (await RelationshipAsync(ana, dani)).ShouldBe("Following");
+        (await VisibilitiesAsync(ana, dani)).ShouldBe(["Everyone"]);
+
+        await dani.VerifyEmailAsync(api);
+        await FollowAsync(dani, ana);
+        (await RelationshipAsync(ana, dani)).ShouldBe("Friends");
+        (await VisibilitiesAsync(ana, dani)).ShouldBe(["Everyone", "Friends"]);
+    }
+
+    [Fact]
+    public async Task A_profile_that_becomes_public_accepts_who_was_waiting()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
+        using var dani = await TestUser.RegisterAsync(api, "dani@example.com");
+        await ana.VerifyEmailAsync(api);
+        await MakePrivateAsync(dani);
+        await FollowAsync(ana, dani);
+
+        await MakePrivateAsync(dani, isPrivate: false);
+
+        await Eventually.Until(
+            () => RelationshipAsync(ana, dani),
+            status => string.Equals(status, "Following", StringComparison.Ordinal),
+            "the request is accepted");
+        (await dani.Client.GetJsonAsync("/api/v1/follow-requests/received")).GetProperty("items").GetArrayLength().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_private_profile_only_shows_its_username_photo_bio_and_numbers_to_who_does_not_follow_it()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var stranger = await TestUser.RegisterAsync(api, "stranger@example.com");
+        using var follower = await TestUser.RegisterAsync(api, "follower@example.com");
+        using var dani = await TestUser.RegisterAsync(api, "dani@example.com", username: "dani", displayName: "Dani Prieto");
+        await follower.VerifyEmailAsync(api);
+        using var profile = await dani.Client.PutJsonAsync("/api/v1/me/profile", new { displayName = "Dani Prieto", bio = "Con Bimba", city = "Madrid", avatarAssetId = (Guid?)null });
+        profile.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var petId = await CreatePetAsync(dani, "Bimba");
+        var walkId = await PutWalkAsync(dani, petId, "Everyone");
+        await FollowAsync(follower, dani);
+        await MakePrivateAsync(dani);
+
+        var restricted = await stranger.Client.GetJsonAsync($"/api/v1/users/{dani.Id}");
+
+        restricted.GetProperty("isPrivate").GetBoolean().ShouldBeTrue();
+        restricted.GetProperty("username").GetString().ShouldBe("dani");
+        restricted.GetProperty("displayName").GetString().ShouldBe("dani");
+        restricted.GetProperty("bio").GetString().ShouldBe("Con Bimba");
+        restricted.GetProperty("city").ValueKind.ShouldBe(JsonValueKind.Null);
+        (await stranger.Client.GetJsonAsync($"/api/v1/users/{dani.Id}/counts")).GetProperty("followers").GetInt32().ShouldBe(1);
+
+        foreach (var path in new[] { "pets", "walks", "walk-stats" })
+        {
+            using var denied = await GetAsync(stranger, $"/api/v1/users/{dani.Id}/{path}");
+            denied.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            (await CodeAsync(denied)).ShouldBe("identity.profile_private");
+        }
+
+        using var pet = await GetAsync(stranger, $"/api/v1/pets/{petId}");
+        pet.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        using var walk = await GetAsync(stranger, $"/api/v1/walks/{walkId}");
+        walk.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        var full = await follower.Client.GetJsonAsync($"/api/v1/users/{dani.Id}");
+        full.GetProperty("displayName").GetString().ShouldBe("Dani Prieto");
+        full.GetProperty("city").GetString().ShouldBe("Madrid");
+        (await follower.Client.GetJsonAsync($"/api/v1/users/{dani.Id}/pets")).GetProperty("items").GetArrayLength().ShouldBe(1);
+        (await follower.Client.GetJsonAsync($"/api/v1/users/{dani.Id}/walk-stats")).GetProperty("walkCount").GetInt32().ShouldBe(1);
+        (await follower.Client.GetJsonAsync($"/api/v1/walks/{walkId}")).GetProperty("note").GetString().ShouldBe("Por el Retiro");
+    }
+
+    [Fact]
+    public async Task The_search_only_finds_a_private_profile_by_its_username_unless_you_follow_it()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var stranger = await TestUser.RegisterAsync(api, "stranger@example.com", displayName: "Quien Busca");
+        using var follower = await TestUser.RegisterAsync(api, "follower@example.com", displayName: "Quien Sigue");
+        using var dani = await TestUser.RegisterAsync(api, "dani@example.com", username: "dani_p", displayName: "Rocío Prieto");
+        await follower.VerifyEmailAsync(api);
+        await CreatePetAsync(dani, "Bimba");
+        await FollowAsync(follower, dani);
+        await MakePrivateAsync(dani);
+
+        (await SearchUsersAsync(stranger, "rocio")).ShouldBeEmpty();
+        (await SearchUsersAsync(stranger, "dani_p")).ShouldBe(["dani_p"]);
+        var found = (await stranger.Client.GetJsonAsync("/api/v1/search/users?q=dani_p")).GetProperty("items")[0];
+        found.GetProperty("displayName").GetString().ShouldBe("dani_p");
+        found.GetProperty("city").ValueKind.ShouldBe(JsonValueKind.Null);
+        (await SearchPetsAsync(stranger, "Bimba")).ShouldBeEmpty();
+
+        (await SearchUsersAsync(follower, "rocio")).ShouldBe(["dani_p"]);
+        (await follower.Client.GetJsonAsync("/api/v1/search/users?q=rocio")).GetProperty("items")[0].GetProperty("displayName").GetString().ShouldBe("Rocío Prieto");
+        (await SearchPetsAsync(follower, "Bimba")).ShouldBe(["Bimba"]);
+    }
+
+    [Theory]
+    [InlineData("friends")]
+    [InlineData("followers")]
+    [InlineData("following")]
+    public async Task Only_that_person_and_their_friends_can_see_their_lists(string list)
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
+        using var friend = await TestUser.RegisterAsync(api, "friend@example.com");
+        using var follower = await TestUser.RegisterAsync(api, "follower@example.com");
+        using var stranger = await TestUser.RegisterAsync(api, "stranger@example.com");
+        await BefriendAsync(api, ana, friend);
+        await follower.VerifyEmailAsync(api);
+        await FollowAsync(follower, ana);
+
+        (await ana.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/{list}")).GetProperty("items").GetArrayLength().ShouldBeGreaterThan(0);
+        (await friend.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/{list}")).GetProperty("items").GetArrayLength().ShouldBeGreaterThan(0);
+
+        foreach (var viewer in new[] { follower, stranger })
+        {
+            using var denied = await GetAsync(viewer, $"/api/v1/users/{ana.Id}/{list}");
+            denied.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            (await CodeAsync(denied)).ShouldBe("social.lists_private");
+        }
+    }
+
+    [Theory]
+    [InlineData("friends")]
+    [InlineData("followers")]
+    [InlineData("following")]
+    public async Task A_list_of_people_goes_through_its_pages_without_repeating_anyone(string list)
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
+        await ana.VerifyEmailAsync(api);
+        var people = new List<TestUser>();
+        for (var i = 0; i < 3; i++)
+        {
+            var person = await TestUser.RegisterAsync(api, $"p{i}@example.com", username: $"person_{i}");
+            people.Add(person);
+            await person.VerifyEmailAsync(api);
+            await FollowAsync(ana, person);
+            await FollowAsync(person, ana);
+        }
+
+        var seen = new List<Guid>();
+        var path = $"/api/v1/users/{ana.Id}/{list}?limit=2";
+        var first = await ana.Client.GetJsonAsync(path);
+        seen.AddRange(first.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("user").GetProperty("id").GetGuid()));
+        var second = await ana.Client.GetJsonAsync($"{path}&cursor={first.GetProperty("nextCursor").GetString()}");
+        seen.AddRange(second.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("user").GetProperty("id").GetGuid()));
+
+        second.GetProperty("nextCursor").ValueKind.ShouldBe(JsonValueKind.Null);
+        seen.ShouldBe(people.AsEnumerable().Reverse().Select(person => person.Id));
+        foreach (var person in people)
+        {
+            person.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task Someone_can_be_removed_from_your_followers()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
+        using var bea = await TestUser.RegisterAsync(api, "bea@example.com");
+        await BefriendAsync(api, ana, bea);
+
+        using var removed = await DeleteAsync(ana, $"/api/v1/users/{bea.Id}/follower");
+
+        removed.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var answer = await removed.JsonAsync();
+        answer.GetProperty("status").GetString().ShouldBe("Following");
+        answer.GetProperty("followsYou").GetBoolean().ShouldBeFalse();
+        (await RelationshipAsync(bea, ana)).ShouldBe("None");
+    }
+
+    [Fact]
+    public async Task Concurrent_follows_between_two_people_leave_a_friendship()
     {
         await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
         using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
@@ -231,8 +417,8 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         await bea.VerifyEmailAsync(api);
 
         var responses = await Task.WhenAll(
-            ana.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = bea.Id }),
-            bea.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = ana.Id }));
+            ana.Client.PutJsonAsync($"/api/v1/users/{bea.Id}/follow", new { }),
+            bea.Client.PutJsonAsync($"/api/v1/users/{ana.Id}/follow", new { }));
 
         responses.ShouldAllBe(response => response.IsSuccessStatusCode);
         foreach (var response in responses)
@@ -241,21 +427,21 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         }
 
         (await RelationshipAsync(ana, bea)).ShouldBe("Friends");
-        (await ana.Client.GetJsonAsync("/api/v1/friends")).GetProperty("items").GetArrayLength().ShouldBe(1);
+        (await ana.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/friends")).GetProperty("items").GetArrayLength().ShouldBe(1);
     }
 
     [Fact]
-    public async Task Nobody_can_be_their_own_friend_block_or_report_target()
+    public async Task Nobody_can_follow_block_or_report_themselves()
     {
         await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
         using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
         await ana.VerifyEmailAsync(api);
 
-        using var request = await ana.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = ana.Id });
+        using var follow = await ana.Client.PutJsonAsync($"/api/v1/users/{ana.Id}/follow", new { });
         using var block = await ana.Client.PutJsonAsync($"/api/v1/blocks/{ana.Id}", new { });
         using var report = await ana.Client.PostJsonAsync("/api/v1/reports", new { targetType = "User", targetId = ana.Id, reason = "Spam" });
 
-        foreach (var response in new[] { request, block, report })
+        foreach (var response in new[] { follow, block, report })
         {
             response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
             (await CodeAsync(response)).ShouldBe("social.cannot_target_self");
@@ -270,8 +456,11 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
         using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
         using var friend = await TestUser.RegisterAsync(api, "friend@example.com");
+        using var follower = await TestUser.RegisterAsync(api, "follower@example.com");
         using var stranger = await TestUser.RegisterAsync(api, "stranger@example.com");
-        await BefriendAsync(api, friend, ana);
+        await BefriendAsync(api, ana, friend);
+        await follower.VerifyEmailAsync(api);
+        await FollowAsync(follower, ana);
         var petId = await CreatePetAsync(ana);
         var everyone = await PutWalkAsync(ana, petId, "Everyone");
         var friends = await PutWalkAsync(ana, petId, "Friends", minutesAfterStart: 60);
@@ -279,12 +468,16 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
 
         (await VisibilitiesAsync(ana, ana)).ShouldBe(["Everyone", "Friends", "OnlyMe"]);
         (await VisibilitiesAsync(friend, ana)).ShouldBe(["Everyone", "Friends"]);
+        (await VisibilitiesAsync(follower, ana)).ShouldBe(["Everyone"]);
         (await VisibilitiesAsync(stranger, ana)).ShouldBe(["Everyone"]);
+        (await friend.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/walk-stats")).GetProperty("walkCount").GetInt32().ShouldBe(2);
+        (await stranger.Client.GetJsonAsync($"/api/v1/users/{ana.Id}/walk-stats")).GetProperty("walkCount").GetInt32().ShouldBe(1);
 
         foreach (var (viewer, walkId, visible) in new[]
                  {
                      (ana, everyone, true), (ana, friends, true), (ana, onlyMe, true),
                      (friend, everyone, true), (friend, friends, true), (friend, onlyMe, false),
+                     (follower, everyone, true), (follower, friends, false), (follower, onlyMe, false),
                      (stranger, everyone, true), (stranger, friends, false), (stranger, onlyMe, false),
                  })
         {
@@ -350,8 +543,13 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         foreach (var (path, code) in new[]
                  {
                      ($"/api/v1/users/{owner.Id}", "identity.user_not_found"),
+                     ($"/api/v1/users/{owner.Id}/counts", "identity.user_not_found"),
+                     ($"/api/v1/users/{owner.Id}/friends", "identity.user_not_found"),
+                     ($"/api/v1/users/{owner.Id}/followers", "identity.user_not_found"),
+                     ($"/api/v1/users/{owner.Id}/following", "identity.user_not_found"),
                      ($"/api/v1/users/{owner.Id}/pets", "identity.user_not_found"),
                      ($"/api/v1/users/{owner.Id}/walks", "identity.user_not_found"),
+                     ($"/api/v1/users/{owner.Id}/walk-stats", "identity.user_not_found"),
                      ($"/api/v1/pets/{petId}", "pets.not_found"),
                      ($"/api/v1/walks/{walkId}", "walks.not_found"),
                  })
@@ -364,8 +562,8 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         (await SearchUsersAsync(viewer, "owner_name")).ShouldBeEmpty();
         (await SearchPetsAsync(viewer, "Canela")).ShouldBeEmpty();
         (await SearchUsersAsync(owner, "viewer_name")).ShouldBeEmpty();
-        (await viewer.Client.GetJsonAsync("/api/v1/friends")).GetProperty("items").GetArrayLength().ShouldBe(0);
-        (await owner.Client.GetJsonAsync("/api/v1/friends")).GetProperty("items").GetArrayLength().ShouldBe(0);
+        (await viewer.Client.GetJsonAsync($"/api/v1/users/{viewer.Id}/friends")).GetProperty("items").GetArrayLength().ShouldBe(0);
+        (await owner.Client.GetJsonAsync($"/api/v1/users/{owner.Id}/friends")).GetProperty("items").GetArrayLength().ShouldBe(0);
 
         var blocker = ownerBlocks ? owner : viewer;
         var blocked = ownerBlocks ? viewer : owner;
@@ -376,7 +574,7 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
     }
 
     [Fact]
-    public async Task A_blocked_person_cannot_send_requests_and_cannot_tell_why()
+    public async Task A_blocked_person_cannot_follow_and_cannot_tell_why()
     {
         await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
         using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
@@ -384,8 +582,8 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         await bea.VerifyEmailAsync(api);
         await BlockAsync(ana, bea);
 
-        using var toBlocker = await bea.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = ana.Id });
-        using var toNobody = await bea.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = Guid.CreateVersion7() });
+        using var toBlocker = await bea.Client.PutJsonAsync($"/api/v1/users/{ana.Id}/follow", new { });
+        using var toNobody = await bea.Client.PutJsonAsync($"/api/v1/users/{Guid.CreateVersion7()}/follow", new { });
 
         toBlocker.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         toNobody.StatusCode.ShouldBe(HttpStatusCode.NotFound);
@@ -394,7 +592,7 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
     }
 
     [Fact]
-    public async Task Blocking_removes_the_friendship_and_the_requests_and_unblocking_does_not_bring_them_back()
+    public async Task Blocking_removes_the_follows_and_the_requests_and_unblocking_does_not_bring_them_back()
     {
         await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
         using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
@@ -402,15 +600,15 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         using var carlos = await TestUser.RegisterAsync(api, "carlos@example.com");
         await BefriendAsync(api, ana, bea);
         await carlos.VerifyEmailAsync(api);
-        using var pending = await carlos.Client.PostJsonAsync("/api/v1/friend-requests", new { userId = ana.Id });
-        pending.StatusCode.ShouldBe(HttpStatusCode.Created);
+        await MakePrivateAsync(ana);
+        (await FollowAsync(carlos, ana)).GetProperty("status").GetString().ShouldBe("Requested");
 
         await BlockAsync(ana, bea);
         await BlockAsync(ana, bea);
         await BlockAsync(ana, carlos);
 
-        (await ana.Client.GetJsonAsync("/api/v1/friend-requests/received")).GetProperty("items").GetArrayLength().ShouldBe(0);
-        (await carlos.Client.GetJsonAsync("/api/v1/friend-requests/sent")).GetProperty("items").GetArrayLength().ShouldBe(0);
+        (await ana.Client.GetJsonAsync("/api/v1/follow-requests/received")).GetProperty("items").GetArrayLength().ShouldBe(0);
+        (await carlos.Client.GetJsonAsync("/api/v1/follow-requests/sent")).GetProperty("items").GetArrayLength().ShouldBe(0);
         var blocks = await ana.Client.GetJsonAsync("/api/v1/blocks");
         blocks.GetProperty("items").EnumerateArray().Select(block => block.GetProperty("user").GetProperty("id").GetGuid()).ShouldBe([carlos.Id, bea.Id]);
 
@@ -426,7 +624,7 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         using var scope = api.Services.CreateScope();
         var outbox = await scope.ServiceProvider.GetRequiredService<SocialDbContext>().OutboxMessages.Select(message => message.Type).ToListAsync(Token);
         outbox.Count(type => string.Equals(type, "social.user_blocked.v1", StringComparison.Ordinal)).ShouldBe(2);
-        outbox.ShouldContain("social.friendship_removed.v1");
+        outbox.Count(type => string.Equals(type, "social.friendship_removed.v1", StringComparison.Ordinal)).ShouldBe(1);
     }
 
     [Fact]
@@ -522,8 +720,7 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
     [Theory]
     [InlineData("/api/v1/search/users?q=ana&cursor=!!")]
     [InlineData("/api/v1/search/pets?q=ana&cursor=!!")]
-    [InlineData("/api/v1/friends?cursor=!!")]
-    [InlineData("/api/v1/friend-requests/received?cursor=!!")]
+    [InlineData("/api/v1/follow-requests/received?cursor=!!")]
     [InlineData("/api/v1/blocks?cursor=!!")]
     public async Task A_bad_cursor_is_rejected(string path)
     {
@@ -531,6 +728,18 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
 
         using var response = await GetAsync(ana, path);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await CodeAsync(response)).ShouldBe("request.invalid");
+    }
+
+    [Fact]
+    public async Task A_bad_cursor_in_your_own_list_is_rejected()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var ana = await TestUser.RegisterAsync(api, "ana@example.com");
+
+        using var response = await GetAsync(ana, $"/api/v1/users/{ana.Id}/followers?cursor=!!");
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await CodeAsync(response)).ShouldBe("request.invalid");
@@ -560,6 +769,24 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
     }
 
     [Fact]
+    public async Task The_profile_can_be_chosen_private_when_creating_the_account()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var dani = await TestUser.RegisterAsync(api, "dani@example.com", onboard: false);
+
+        (await dani.Client.GetJsonAsync("/api/v1/me")).GetProperty("isPrivate").GetBoolean().ShouldBeFalse();
+
+        using var chosen = await dani.Client.PutJsonAsync("/api/v1/me/username", new { username = "dani", isPrivate = true });
+
+        chosen.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await chosen.JsonAsync()).GetProperty("isPrivate").GetBoolean().ShouldBeTrue();
+        (await dani.Client.GetJsonAsync("/api/v1/me/profile")).GetProperty("isPrivate").GetBoolean().ShouldBeTrue();
+
+        using var again = await dani.Client.PutJsonAsync("/api/v1/me/username", new { username = "dani" });
+        (await again.JsonAsync()).GetProperty("isPrivate").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task A_report_is_kept_once_and_validated()
     {
         await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
@@ -586,7 +813,7 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
     }
 
     [Fact]
-    public async Task Requests_and_reports_have_a_limit_per_person()
+    public async Task Follows_and_reports_have_a_limit_per_person()
     {
         await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure, new Dictionary<string, string?>(StringComparer.Ordinal)
         {
@@ -624,13 +851,13 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         using var deleted = await ana.Client.SendAsync(request, Token);
         deleted.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
-        (await bea.Client.GetJsonAsync("/api/v1/friends")).GetProperty("items").GetArrayLength().ShouldBe(0);
+        (await bea.Client.GetJsonAsync($"/api/v1/users/{bea.Id}/friends")).GetProperty("items").GetArrayLength().ShouldBe(0);
         using var scope = api.Services.CreateScope();
         var social = scope.ServiceProvider.GetRequiredService<SocialDbContext>();
         await Eventually.Until(
-            () => social.Friendships.CountAsync(Token),
+            () => social.Follows.CountAsync(Token),
             count => count == 0,
-            "the friendships of the deleted account are erased");
+            "the follows of the deleted account are erased");
         await Eventually.Until(
             () => social.UserBlocks.CountAsync(Token),
             count => count == 0,

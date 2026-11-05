@@ -6,24 +6,63 @@ using GeoWoof.Modules.Social.Domain;
 
 namespace GeoWoof.Modules.Social.UnitTests;
 
-internal sealed class FakeRequests : IFriendRequestRepository
+internal sealed class FakeFollows : IFollowRepository
 {
-    public List<FriendRequest> Items { get; } = [];
+    public List<Follow> Items { get; } = [];
 
-    public Task<FriendRequest?> GetByIdAsync(Guid requestId, CancellationToken cancellationToken) =>
-        Task.FromResult(Items.Find(request => request.Id == requestId));
+    public Task<Follow?> GetAsync(Guid followerId, Guid followeeId, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Find(follow => follow.FollowerId == followerId && follow.FolloweeId == followeeId));
 
-    public Task<FriendRequest?> GetPendingBetweenAsync(Guid first, Guid second, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<PersonRow>> GetPageAsync(Guid userId, PeopleList list, SocialPosition? after, int take, CancellationToken cancellationToken)
     {
-        var pair = new UserPair(first, second);
-        return Task.FromResult(Items.Find(request => request.UserLowId == pair.Low && request.UserHighId == pair.High && request.Status == FriendRequestStatus.Pending));
+        var rows = list switch
+        {
+            PeopleList.Followers => Items.Where(follow => follow.FolloweeId == userId).Select(follow => new PersonRow(follow.FollowerId, follow.CreatedAt, follow.Id)),
+            PeopleList.Following => Items.Where(follow => follow.FollowerId == userId).Select(follow => new PersonRow(follow.FolloweeId, follow.CreatedAt, follow.Id)),
+            _ => Items
+                .Where(follow => follow.FollowerId == userId && Items.Exists(other => other.FollowerId == follow.FolloweeId && other.FolloweeId == userId))
+                .Select(follow => new PersonRow(follow.FolloweeId, follow.CreatedAt, follow.Id)),
+        };
+        IReadOnlyList<PersonRow> found = rows
+            .OrderByDescending(row => row.Since)
+            .ThenByDescending(row => row.Id)
+            .Where(row => after is null || row.Since < after.At || (row.Since == after.At && row.Id.CompareTo(after.Id) < 0))
+            .Take(take)
+            .ToList();
+        return Task.FromResult(found);
     }
 
-    public Task<IReadOnlyList<FriendRequest>> GetPendingPageAsync(Guid userId, RequestDirection direction, SocialPosition? after, int take, CancellationToken cancellationToken)
+    public Task<SocialCounts> GetCountsAsync(Guid userId, CancellationToken cancellationToken) => Task.FromResult(new SocialCounts(
+        Items.Count(follow => follow.FolloweeId == userId),
+        Items.Count(follow => follow.FollowerId == userId),
+        Items.Count(follow => follow.FollowerId == userId && Items.Exists(other => other.FollowerId == follow.FolloweeId && other.FolloweeId == userId))));
+
+    public Task<IReadOnlyList<Follow>> GetAllOfUserAsync(Guid userId, CancellationToken cancellationToken)
     {
-        IReadOnlyList<FriendRequest> found = Items
-            .Where(request => request.Status == FriendRequestStatus.Pending)
-            .Where(request => direction == RequestDirection.Received ? request.AddresseeId == userId : request.RequesterId == userId)
+        IReadOnlyList<Follow> found = Items.Where(follow => follow.FollowerId == userId || follow.FolloweeId == userId).ToList();
+        return Task.FromResult(found);
+    }
+
+    public void Add(Follow follow) => Items.Add(follow);
+
+    public void Remove(Follow follow) => Items.Remove(follow);
+}
+
+internal sealed class FakeRequests : IFollowRequestRepository
+{
+    public List<FollowRequest> Items { get; } = [];
+
+    public Task<FollowRequest?> GetByIdAsync(Guid requestId, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Find(request => request.Id == requestId));
+
+    public Task<FollowRequest?> GetPendingAsync(Guid requesterId, Guid targetId, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Find(request => request.RequesterId == requesterId && request.TargetId == targetId && request.Status == FollowRequestStatus.Pending));
+
+    public Task<IReadOnlyList<FollowRequest>> GetPendingPageAsync(Guid userId, RequestDirection direction, SocialPosition? after, int take, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<FollowRequest> found = Items
+            .Where(request => request.Status == FollowRequestStatus.Pending)
+            .Where(request => direction == RequestDirection.Received ? request.TargetId == userId : request.RequesterId == userId)
             .OrderByDescending(request => request.CreatedAt)
             .ThenByDescending(request => request.Id)
             .Where(request => after is null || request.CreatedAt < after.At || (request.CreatedAt == after.At && request.Id.CompareTo(after.Id) < 0))
@@ -32,48 +71,21 @@ internal sealed class FakeRequests : IFriendRequestRepository
         return Task.FromResult(found);
     }
 
-    public Task<IReadOnlyList<FriendRequest>> GetAllOfUserAsync(Guid userId, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<FollowRequest>> GetAllPendingForAsync(Guid targetId, CancellationToken cancellationToken)
     {
-        IReadOnlyList<FriendRequest> found = Items.Where(request => request.RequesterId == userId || request.AddresseeId == userId).ToList();
+        IReadOnlyList<FollowRequest> found = Items.Where(request => request.TargetId == targetId && request.Status == FollowRequestStatus.Pending).ToList();
         return Task.FromResult(found);
     }
 
-    public void Add(FriendRequest request) => Items.Add(request);
-
-    public void Remove(FriendRequest request) => Items.Remove(request);
-}
-
-internal sealed class FakeFriendships : IFriendshipRepository
-{
-    public List<Friendship> Items { get; } = [];
-
-    public Task<Friendship?> GetBetweenAsync(Guid first, Guid second, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<FollowRequest>> GetAllOfUserAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var pair = new UserPair(first, second);
-        return Task.FromResult(Items.Find(friendship => friendship.UserAId == pair.Low && friendship.UserBId == pair.High));
-    }
-
-    public Task<IReadOnlyList<Friendship>> GetPageAsync(Guid userId, SocialPosition? after, int take, CancellationToken cancellationToken)
-    {
-        IReadOnlyList<Friendship> found = Items
-            .Where(friendship => friendship.UserAId == userId || friendship.UserBId == userId)
-            .OrderByDescending(friendship => friendship.CreatedAt)
-            .ThenByDescending(friendship => friendship.Id)
-            .Where(friendship => after is null || friendship.CreatedAt < after.At || (friendship.CreatedAt == after.At && friendship.Id.CompareTo(after.Id) < 0))
-            .Take(take)
-            .ToList();
+        IReadOnlyList<FollowRequest> found = Items.Where(request => request.RequesterId == userId || request.TargetId == userId).ToList();
         return Task.FromResult(found);
     }
 
-    public Task<IReadOnlyList<Friendship>> GetAllOfUserAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        IReadOnlyList<Friendship> found = Items.Where(friendship => friendship.UserAId == userId || friendship.UserBId == userId).ToList();
-        return Task.FromResult(found);
-    }
+    public void Add(FollowRequest request) => Items.Add(request);
 
-    public void Add(Friendship friendship) => Items.Add(friendship);
-
-    public void Remove(Friendship friendship) => Items.Remove(friendship);
+    public void Remove(FollowRequest request) => Items.Remove(request);
 }
 
 internal sealed class FakeBlocks : IUserBlockRepository
@@ -125,12 +137,12 @@ internal sealed class FakeReports : IReportRepository
 }
 
 /// <summary>Reads the relationships as they are, and remembers who was invalidated.</summary>
-internal sealed class FakeGraphs(FakeFriendships friendships, FakeBlocks blocks) : ISocialGraphCache
+internal sealed class FakeGraphs(FakeFollows follows, FakeBlocks blocks) : ISocialGraphCache
 {
     public List<Guid> Invalidated { get; } = [];
 
     public ValueTask<SocialGraph> GetAsync(Guid userId, CancellationToken cancellationToken) => ValueTask.FromResult(new SocialGraph(
-        friendships.Items.Where(friendship => friendship.UserAId == userId || friendship.UserBId == userId).Select(friendship => friendship.OtherThan(userId)).ToList(),
+        follows.Items.Where(follow => follow.FollowerId == userId).Select(follow => follow.FolloweeId).ToList(),
         blocks.Items.Where(block => block.BlockerId == userId).Select(block => block.BlockedId).ToList(),
         blocks.Items.Where(block => block.BlockedId == userId).Select(block => block.BlockerId).ToList()));
 
@@ -170,7 +182,8 @@ internal sealed class FakeIdentity : IIdentityApi
 {
     public Dictionary<Guid, UserSummary> Users { get; } = [];
 
-    public void Add(Guid id, string username) => Users[id] = new UserSummary(id, username, username, null, null);
+    public void Add(Guid id, string username, bool isPrivate = false) =>
+        Users[id] = new UserSummary(id, username, $"Name of {username}", "Madrid", null, isPrivate);
 
     public Task<Guid?> FindUserIdByEmailAsync(string email, CancellationToken cancellationToken) => Task.FromResult<Guid?>(null);
 

@@ -24,6 +24,8 @@ public sealed record ChangePasswordRequest(string? CurrentPassword, string NewPa
 
 public sealed record UpdateMeRequest(string? DisplayName, string? Language);
 
-public sealed record ChangeUsernameRequest(string Username);
+public sealed record ChangeUsernameRequest(string Username, bool? IsPrivate = null);
+
+public sealed record ChangePrivacyRequest(bool IsPrivate);
 
 public sealed record DeleteAccountRequest(string? Password, string? GoogleIdToken);

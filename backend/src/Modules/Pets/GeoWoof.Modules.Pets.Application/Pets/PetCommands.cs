@@ -2,6 +2,7 @@ using FluentValidation;
 using GeoWoof.BuildingBlocks.Application.Messaging;
 using GeoWoof.BuildingBlocks.Application.Paging;
 using GeoWoof.BuildingBlocks.Domain.Results;
+using GeoWoof.BuildingBlocks.Domain.Visibility;
 using GeoWoof.Modules.Identity.Contracts;
 using GeoWoof.Modules.Media.Contracts;
 using GeoWoof.Modules.Pets.Application.Abstractions;
@@ -32,9 +33,14 @@ internal sealed class GetUserPetsQueryHandler(IPetRepository pets, IIdentityApi 
     {
         var relationship = await relationships.GetRelationshipAsync(query.ViewerId, query.UserId, cancellationToken);
         var users = await identity.GetPublicUsersAsync([query.UserId], cancellationToken);
-        if (relationship == Relationship.Blocked || !users.ContainsKey(query.UserId))
+        if (relationship == Relationship.Blocked || !users.TryGetValue(query.UserId, out var owner))
         {
             return PetsErrors.UserNotFound;
+        }
+
+        if (!VisibilityRules.CanSeeProfileContent(relationship.ToViewerRelation(), owner.IsPrivate))
+        {
+            return PetsErrors.ProfilePrivate;
         }
 
         var found = await pets.GetByOwnerAsync(query.UserId, cancellationToken);
@@ -44,18 +50,41 @@ internal sealed class GetUserPetsQueryHandler(IPetRepository pets, IIdentityApi 
 
 public sealed record GetPetQuery(Guid ViewerId, Guid PetId) : IQuery<PetDto>;
 
-internal sealed class GetPetQueryHandler(IPetRepository pets, IRelationshipsApi relationships, IMediaApi media) : IQueryHandler<GetPetQuery, PetDto>
+internal sealed class GetPetQueryHandler(IPetRepository pets, IIdentityApi identity, IRelationshipsApi relationships, IMediaApi media) : IQueryHandler<GetPetQuery, PetDto>
 {
     public async Task<Result<PetDto>> Handle(GetPetQuery query, CancellationToken cancellationToken)
     {
         var pet = await pets.GetByIdAsync(query.PetId, cancellationToken);
-        if (pet is null || await relationships.GetRelationshipAsync(query.ViewerId, pet.OwnerId, cancellationToken) == Relationship.Blocked)
+        if (pet is null)
         {
             return PetsErrors.NotFound;
         }
 
+        var relationship = await relationships.GetRelationshipAsync(query.ViewerId, pet.OwnerId, cancellationToken);
+        if (relationship != Relationship.Self)
+        {
+            var users = await identity.GetPublicUsersAsync([pet.OwnerId], cancellationToken);
+            var isPrivate = users.TryGetValue(pet.OwnerId, out var owner) && owner.IsPrivate;
+            if (!VisibilityRules.CanSeeProfileContent(relationship.ToViewerRelation(), isPrivate))
+            {
+                return PetsErrors.NotFound;
+            }
+        }
+
         return await PetMapper.ToDtoAsync(pet, query.ViewerId, media, cancellationToken);
     }
+}
+
+internal static class ViewerRelations
+{
+    public static ViewerRelation ToViewerRelation(this Relationship relationship) => relationship switch
+    {
+        Relationship.Self => ViewerRelation.Owner,
+        Relationship.Friend => ViewerRelation.Friend,
+        Relationship.Follower => ViewerRelation.Follower,
+        Relationship.None => ViewerRelation.Stranger,
+        _ => ViewerRelation.Blocked,
+    };
 }
 
 public sealed record CreatePetCommand(Guid OwnerId, PetInput Input) : ICommand<PetDto>;

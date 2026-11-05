@@ -17,12 +17,17 @@ public sealed record ProfileDto(
     string? Bio,
     string? City,
     MediaImage? Avatar,
+    bool IsPrivate,
     DateTimeOffset CreatedAt);
 
 /// <summary>Builds <see cref="ProfileDto"/>s with the signed URLs of the avatar.</summary>
 internal static class ProfileMapper
 {
-    public static async Task<ProfileDto> ToDtoAsync(User user, IMediaApi media, CancellationToken cancellationToken)
+    /// <param name="user">The account.</param>
+    /// <param name="media">Signs the URLs.</param>
+    /// <param name="isRestricted">What a private profile shows to those who do not follow it (docs/api.md, phase 5).</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public static async Task<ProfileDto> ToDtoAsync(User user, IMediaApi media, CancellationToken cancellationToken, bool isRestricted = false)
     {
         MediaImage? avatar = null;
         if (user.AvatarAssetId is { } assetId)
@@ -31,7 +36,15 @@ internal static class ProfileMapper
             avatar = images.GetValueOrDefault(assetId);
         }
 
-        return new ProfileDto(user.Id, user.Username?.Value, user.DisplayName, user.Bio, user.City, avatar, user.CreatedAt);
+        return new ProfileDto(
+            user.Id,
+            user.Username?.Value,
+            isRestricted ? user.Username!.Value : user.DisplayName,
+            user.Bio,
+            isRestricted ? null : user.City,
+            avatar,
+            user.IsPrivate,
+            user.CreatedAt);
     }
 }
 
@@ -55,13 +68,14 @@ internal sealed class GetPublicProfileQueryHandler(IUserRepository users, IRelat
 {
     public async Task<Result<ProfileDto>> Handle(GetPublicProfileQuery query, CancellationToken cancellationToken)
     {
-        if (await relationships.GetRelationshipAsync(query.ViewerId, query.UserId, cancellationToken) == Relationship.Blocked)
+        var relationship = await relationships.GetRelationshipAsync(query.ViewerId, query.UserId, cancellationToken);
+        if (relationship == Relationship.Blocked)
         {
             return IdentityErrors.UserNotFound;
         }
 
         return await users.GetByIdAsync(query.UserId, cancellationToken) is { HasCompletedOnboarding: true } user
-            ? await ProfileMapper.ToDtoAsync(user, media, cancellationToken)
+            ? await ProfileMapper.ToDtoAsync(user, media, cancellationToken, isRestricted: user.IsPrivate && relationship == Relationship.None)
             : IdentityErrors.UserNotFound;
     }
 }

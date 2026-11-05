@@ -177,7 +177,7 @@ internal sealed class InMemoryUsers : IUserRepository
         Task.FromResult<IReadOnlyList<User>>(Items.Where(user => userIds.Contains(user.Id) && user.HasCompletedOnboarding).ToList());
 
     /// <summary>The real search is SQL and has its own integration tests: this finds people by exact name, in order.</summary>
-    public Task<IReadOnlyList<RelevancePosition>> SearchAsync(string text, IReadOnlyCollection<Guid> excludedIds, RelevancePosition after, int take, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<RelevancePosition>> SearchAsync(string text, IReadOnlyCollection<Guid> excludedIds, IReadOnlyCollection<Guid> followedIds, RelevancePosition after, int take, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<RelevancePosition>>(Items
             .Where(user => user.DisplayName == text && user.HasCompletedOnboarding && !excludedIds.Contains(user.Id))
             .Select(user => new RelevancePosition(1, user.Id))
@@ -324,13 +324,15 @@ internal sealed class CapturingPublisher : IIntegrationEventPublisher
 /// <summary>Who is related to whom, in the tests of a module that only knows the contract of Social.</summary>
 internal sealed class FakeRelationships : IRelationshipsApi
 {
-    private readonly HashSet<(Guid, Guid)> _friends = [];
+    private readonly HashSet<(Guid Follower, Guid Followee)> _follows = [];
     private readonly HashSet<(Guid, Guid)> _blocks = [];
+
+    public void Follow(Guid follower, Guid followee) => _follows.Add((follower, followee));
 
     public void Befriend(Guid first, Guid second)
     {
-        _friends.Add((first, second));
-        _friends.Add((second, first));
+        Follow(first, second);
+        Follow(second, first);
     }
 
     public void Block(Guid blocker, Guid blocked) => _blocks.Add((blocker, blocked));
@@ -347,7 +349,12 @@ internal sealed class FakeRelationships : IRelationshipsApi
             return Task.FromResult(Relationship.Blocked);
         }
 
-        return Task.FromResult(_friends.Contains((viewerId, targetId)) ? Relationship.Friend : Relationship.None);
+        if (!_follows.Contains((viewerId, targetId)))
+        {
+            return Task.FromResult(Relationship.None);
+        }
+
+        return Task.FromResult(_follows.Contains((targetId, viewerId)) ? Relationship.Friend : Relationship.Follower);
     }
 
     public Task<IReadOnlyCollection<Guid>> GetHiddenUserIdsAsync(Guid userId, CancellationToken cancellationToken)
@@ -358,5 +365,11 @@ internal sealed class FakeRelationships : IRelationshipsApi
             .Distinct()
             .ToList();
         return Task.FromResult(hidden);
+    }
+
+    public Task<IReadOnlyCollection<Guid>> GetFollowingIdsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<Guid> following = _follows.Where(follow => follow.Follower == userId).Select(follow => follow.Followee).ToList();
+        return Task.FromResult(following);
     }
 }

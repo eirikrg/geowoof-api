@@ -105,6 +105,65 @@ public sealed class ProfileTests
     }
 
     [Fact]
+    public async Task A_private_profile_only_shows_its_username_photo_and_bio_to_those_who_do_not_follow_it()
+    {
+        await using var host = new IdentityTestHost();
+        var dani = host.AddUser("dani@example.com", username: "dani");
+        dani.UpdateProfile("Dani Prieto", "Con Bimba", "Madrid", null);
+        dani.SetPrivate(true);
+        var stranger = host.AddUser("stranger@example.com", username: "stranger").Id;
+        var follower = host.AddUser("follower@example.com", username: "follower").Id;
+        host.Relationships.Follow(follower, dani.Id);
+
+        var strangerSees = (await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(stranger, dani.Id))).Value;
+        var followerSees = (await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(follower, dani.Id))).Value;
+        var ownerSees = (await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(dani.Id, dani.Id))).Value;
+
+        strangerSees.IsPrivate.ShouldBeTrue();
+        strangerSees.Username.ShouldBe("dani");
+        strangerSees.DisplayName.ShouldBe("dani");
+        strangerSees.City.ShouldBeNull();
+        strangerSees.Bio.ShouldBe("Con Bimba");
+        followerSees.DisplayName.ShouldBe("Dani Prieto");
+        followerSees.City.ShouldBe("Madrid");
+        ownerSees.DisplayName.ShouldBe("Dani Prieto");
+    }
+
+    [Fact]
+    public async Task A_public_profile_shows_everything_to_anyone()
+    {
+        await using var host = new IdentityTestHost();
+        var ana = host.AddUser("ana@example.com", username: "ana");
+        ana.UpdateProfile("Ana López", null, "Madrid", null);
+        var stranger = host.AddUser("stranger@example.com", username: "stranger").Id;
+
+        var seen = (await host.QueryAsync<GetPublicProfileQuery, ProfileDto>(new GetPublicProfileQuery(stranger, ana.Id))).Value;
+
+        seen.IsPrivate.ShouldBeFalse();
+        seen.DisplayName.ShouldBe("Ana López");
+        seen.City.ShouldBe("Madrid");
+    }
+
+    [Fact]
+    public async Task The_search_shows_a_private_profile_restricted_unless_you_follow_it()
+    {
+        await using var host = new IdentityTestHost();
+        var viewer = host.AddUser("viewer@example.com", username: "viewer");
+        var dani = host.AddUser("dani@example.com", username: "dani");
+        dani.UpdateProfile("Ana", null, "Madrid", null);
+        dani.SetPrivate(true);
+
+        var restricted = await host.QueryAsync<SearchUsersQuery, PagedResponse<UserSummaryDto>>(new SearchUsersQuery(viewer.Id, "Ana", null, null));
+        host.Relationships.Follow(viewer.Id, dani.Id);
+        var full = await host.QueryAsync<SearchUsersQuery, PagedResponse<UserSummaryDto>>(new SearchUsersQuery(viewer.Id, "Ana", null, null));
+
+        restricted.Value.Items.Single().DisplayName.ShouldBe("dani");
+        restricted.Value.Items.Single().City.ShouldBeNull();
+        full.Value.Items.Single().DisplayName.ShouldBe("Ana");
+        full.Value.Items.Single().City.ShouldBe("Madrid");
+    }
+
+    [Fact]
     public async Task The_search_leaves_out_the_viewer_and_the_blocked_in_both_directions()
     {
         await using var host = new IdentityTestHost();

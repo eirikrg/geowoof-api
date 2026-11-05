@@ -7,6 +7,10 @@ namespace GeoWoof.Modules.Identity.Contracts;
 public sealed record UserProfileUpdated(Guid UserId, string? Username, string DisplayName, DateTimeOffset OccurredAt)
     : IntegrationEvent(OccurredAt);
 
+/// <summary>Someone made their profile public or private.</summary>
+[EventType("identity.user_privacy_changed.v1")]
+public sealed record UserPrivacyChanged(Guid UserId, bool IsPrivate, DateTimeOffset OccurredAt) : IntegrationEvent(OccurredAt);
+
 /// <summary>A user account was deleted. Every module must delete or anonymise the user's data.</summary>
 [EventType("identity.user_deleted.v1")]
 public sealed record UserDeleted(Guid UserId, DateTimeOffset OccurredAt) : IntegrationEvent(OccurredAt);

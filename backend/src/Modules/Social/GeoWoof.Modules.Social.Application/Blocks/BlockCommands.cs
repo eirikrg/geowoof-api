@@ -8,13 +8,13 @@ using GeoWoof.Modules.Social.Domain;
 
 namespace GeoWoof.Modules.Social.Application.Blocks;
 
-/// <summary>Also ends the friendship and removes the pending requests, in both directions.</summary>
+/// <summary>Also removes the follows and the pending requests, in both directions.</summary>
 public sealed record BlockUserCommand(Guid BlockerId, Guid UserId) : ICommand;
 
 internal sealed class BlockUserCommandHandler(
     IUserBlockRepository blocks,
-    IFriendshipRepository friendships,
-    IFriendRequestRepository requests,
+    IFollowRepository follows,
+    IFollowRequestRepository requests,
     IIdentityApi identity,
     ISocialGraphCache graphs,
     ISocialUnitOfWork unitOfWork,
@@ -38,16 +38,9 @@ internal sealed class BlockUserCommandHandler(
             return Result.Success();
         }
 
-        if (await friendships.GetBetweenAsync(command.BlockerId, command.UserId, cancellationToken) is { } friendship)
-        {
-            friendship.End();
-            friendships.Remove(friendship);
-        }
-
-        if (await requests.GetPendingBetweenAsync(command.BlockerId, command.UserId, cancellationToken) is { } pending)
-        {
-            requests.Remove(pending);
-        }
+        await RemoveFollowsAsync(command, cancellationToken);
+        await RemovePendingAsync(command.BlockerId, command.UserId, cancellationToken);
+        await RemovePendingAsync(command.UserId, command.BlockerId, cancellationToken);
 
         var now = timeProvider.GetUtcNow();
         blocks.Add(UserBlock.Create(Guid.CreateVersion7(now), command.BlockerId, command.UserId, now));
@@ -63,6 +56,32 @@ internal sealed class BlockUserCommandHandler(
 
         await graphs.InvalidateAsync(command.BlockerId, command.UserId, cancellationToken);
         return Result.Success();
+    }
+
+    /// <summary>Two rows, but one friendship: only one of them says that it ends.</summary>
+    private async Task RemoveFollowsAsync(BlockUserCommand command, CancellationToken cancellationToken)
+    {
+        var mine = await follows.GetAsync(command.BlockerId, command.UserId, cancellationToken);
+        var theirs = await follows.GetAsync(command.UserId, command.BlockerId, cancellationToken);
+        if (mine is not null)
+        {
+            mine.End(theyFollowBack: theirs is not null);
+            follows.Remove(mine);
+        }
+
+        if (theirs is not null)
+        {
+            theirs.End(theyFollowBack: false);
+            follows.Remove(theirs);
+        }
+    }
+
+    private async Task RemovePendingAsync(Guid requesterId, Guid targetId, CancellationToken cancellationToken)
+    {
+        if (await requests.GetPendingAsync(requesterId, targetId, cancellationToken) is { } pending)
+        {
+            requests.Remove(pending);
+        }
     }
 }
 
@@ -106,7 +125,7 @@ internal sealed class GetBlocksQueryHandler(IUserBlockRepository blocks, UserSum
         var page = rows.Take(limit).ToList();
         var next = rows.Count > limit ? SocialCursor.Encode(page[^1].CreatedAt, page[^1].Id) : null;
 
-        var people = await summaries.LoadAsync(page.Select(block => block.BlockedId).ToList(), cancellationToken);
+        var people = await summaries.LoadAsync(query.UserId, page.Select(block => block.BlockedId).ToList(), cancellationToken);
         var items = page
             .Where(block => people.ContainsKey(block.BlockedId))
             .Select(block => new BlockDto(people[block.BlockedId], block.CreatedAt))

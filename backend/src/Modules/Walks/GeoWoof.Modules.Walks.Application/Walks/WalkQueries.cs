@@ -18,6 +18,7 @@ internal static class ViewerRelations
     {
         Relationship.Self => ViewerRelation.Owner,
         Relationship.Friend => ViewerRelation.Friend,
+        Relationship.Follower => ViewerRelation.Follower,
         Relationship.None => ViewerRelation.Stranger,
         _ => ViewerRelation.Blocked,
     };
@@ -26,7 +27,7 @@ internal static class ViewerRelations
 /// <summary>For whoever cannot see it, the walk does not exist (docs/api.md).</summary>
 public sealed record GetWalkQuery(Guid ViewerId, Guid WalkId) : IQuery<WalkDto>;
 
-internal sealed class GetWalkQueryHandler(IWalkRepository walks, IRelationshipsApi relationships, IMediaApi media) : IQueryHandler<GetWalkQuery, WalkDto>
+internal sealed class GetWalkQueryHandler(IWalkRepository walks, IIdentityApi identity, IRelationshipsApi relationships, IMediaApi media) : IQueryHandler<GetWalkQuery, WalkDto>
 {
     public async Task<Result<WalkDto>> Handle(GetWalkQuery query, CancellationToken cancellationToken)
     {
@@ -37,7 +38,9 @@ internal sealed class GetWalkQueryHandler(IWalkRepository walks, IRelationshipsA
         }
 
         var relationship = await relationships.GetRelationshipAsync(query.ViewerId, walk.OwnerId, cancellationToken);
-        return walk.IsVisibleTo(relationship.ToViewerRelation())
+        var users = await identity.GetPublicUsersAsync([walk.OwnerId], cancellationToken);
+        var isPrivate = users.TryGetValue(walk.OwnerId, out var owner) && owner.IsPrivate;
+        return walk.IsVisibleTo(relationship.ToViewerRelation(), isPrivate)
             ? await WalkMapper.ToDtoAsync(walk, query.ViewerId, media, cancellationToken)
             : WalksErrors.NotFound;
     }
@@ -53,9 +56,14 @@ internal sealed class GetUserWalksQueryHandler(IWalkRepository walks, IIdentityA
     {
         var viewer = (await relationships.GetRelationshipAsync(query.ViewerId, query.UserId, cancellationToken)).ToViewerRelation();
         var users = await identity.GetPublicUsersAsync([query.UserId], cancellationToken);
-        if (viewer == ViewerRelation.Blocked || !users.ContainsKey(query.UserId))
+        if (viewer == ViewerRelation.Blocked || !users.TryGetValue(query.UserId, out var owner))
         {
             return WalksErrors.UserNotFound;
+        }
+
+        if (!VisibilityRules.CanSeeProfileContent(viewer, owner.IsPrivate))
+        {
+            return WalksErrors.ProfilePrivate;
         }
 
         WalkPageCursor? after = null;
@@ -69,7 +77,7 @@ internal sealed class GetUserWalksQueryHandler(IWalkRepository walks, IIdentityA
         }
 
         var limit = PageLimit.Normalize(query.Limit);
-        var rows = await walks.GetPageAsync(query.UserId, null, VisibilityRules.VisibleTo(viewer), after, limit + 1, cancellationToken);
+        var rows = await walks.GetPageAsync(query.UserId, null, VisibilityRules.VisibleTo(viewer, owner.IsPrivate), after, limit + 1, cancellationToken);
         var page = rows.Take(limit).ToList();
         var next = rows.Count > limit ? WalkCursor.Encode(page[^1]) : null;
 
@@ -155,7 +163,40 @@ internal sealed class GetWalkStatsQueryHandler(IWalkRepository walks, IPetsApi p
             return access.Error;
         }
 
-        var rows = await walks.GetStatsRowsAsync(query.ViewerId, query.PetId, cancellationToken);
+        var rows = await walks.GetStatsRowsAsync(query.ViewerId, query.PetId, null, cancellationToken);
+        return WalkStatsCalculator.From(rows, timeProvider);
+    }
+}
+
+/// <summary>The totals of the walks of a person that the viewer can see.</summary>
+public sealed record GetUserWalkStatsQuery(Guid ViewerId, Guid UserId) : IQuery<WalkStatsDto>;
+
+internal sealed class GetUserWalkStatsQueryHandler(IWalkRepository walks, IIdentityApi identity, IRelationshipsApi relationships, TimeProvider timeProvider)
+    : IQueryHandler<GetUserWalkStatsQuery, WalkStatsDto>
+{
+    public async Task<Result<WalkStatsDto>> Handle(GetUserWalkStatsQuery query, CancellationToken cancellationToken)
+    {
+        var viewer = (await relationships.GetRelationshipAsync(query.ViewerId, query.UserId, cancellationToken)).ToViewerRelation();
+        var users = await identity.GetPublicUsersAsync([query.UserId], cancellationToken);
+        if (viewer == ViewerRelation.Blocked || !users.TryGetValue(query.UserId, out var owner))
+        {
+            return WalksErrors.UserNotFound;
+        }
+
+        if (!VisibilityRules.CanSeeProfileContent(viewer, owner.IsPrivate))
+        {
+            return WalksErrors.ProfilePrivate;
+        }
+
+        var rows = await walks.GetStatsRowsAsync(query.UserId, null, VisibilityRules.VisibleTo(viewer, owner.IsPrivate), cancellationToken);
+        return WalkStatsCalculator.From(rows, timeProvider);
+    }
+}
+
+internal static class WalkStatsCalculator
+{
+    public static WalkStatsDto From(IReadOnlyList<WalkStatsRow> rows, TimeProvider timeProvider)
+    {
         var moments = rows.Select(row => new WalkMoment(row.StartedAt, row.TimeZone)).ToList();
         return new WalkStatsDto(
             rows.Count,

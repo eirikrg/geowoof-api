@@ -59,6 +59,8 @@ public static class IdentityEndpoints
         me.MapPut("/profile", ReplaceMyProfileAsync)
             .Produces<ProfileDto>().ProducesValidationProblem().ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
+        me.MapPut("/privacy", ChangePrivacyAsync).Produces<UserDto>().ProducesValidationProblem();
+
         api.MapGet("/users/{id:guid}", GetPublicProfileAsync).WithTags("Account")
             .Produces<ProfileDto>().ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -207,12 +209,19 @@ public static class IdentityEndpoints
         return (await handler.Handle(command, cancellationToken)).ToHttpResult(TypedResults.Ok);
     }
 
+    private static async Task<IResult> ChangePrivacyAsync(
+        ChangePrivacyRequest request,
+        ClaimsPrincipal user,
+        ICommandHandler<ChangePrivacyCommand, UserDto> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new ChangePrivacyCommand(user.GetUserId(), request.IsPrivate), cancellationToken)).ToHttpResult(TypedResults.Ok);
+
     private static async Task<IResult> ChangeUsernameAsync(
         ChangeUsernameRequest request,
         ClaimsPrincipal user,
         ICommandHandler<ChangeUsernameCommand, UserDto> handler,
         CancellationToken cancellationToken) =>
-        (await handler.Handle(new ChangeUsernameCommand(user.GetUserId(), request.Username), cancellationToken)).ToHttpResult(TypedResults.Ok);
+        (await handler.Handle(new ChangeUsernameCommand(user.GetUserId(), request.Username, request.IsPrivate), cancellationToken)).ToHttpResult(TypedResults.Ok);
 
     private static async Task<IResult> DeleteAccountAsync(
         [FromBody] DeleteAccountRequest request,

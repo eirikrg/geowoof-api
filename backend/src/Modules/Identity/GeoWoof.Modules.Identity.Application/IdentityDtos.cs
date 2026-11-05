@@ -12,6 +12,7 @@ public sealed record UserDto(
     bool HasPassword,
     IReadOnlyList<string> SignInMethods,
     string Language,
+    bool IsPrivate,
     DateTimeOffset CreatedAt)
 {
     public const string PasswordMethod = "Password";
@@ -39,6 +40,7 @@ public sealed record UserDto(
             user.HasPassword,
             methods,
             LanguageCodes.ToCode(user.Language),
+            user.IsPrivate,
             user.CreatedAt);
     }
 }

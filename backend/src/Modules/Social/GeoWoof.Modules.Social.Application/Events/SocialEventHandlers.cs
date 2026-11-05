@@ -7,20 +7,38 @@ using GeoWoof.Modules.Social.Domain;
 namespace GeoWoof.Modules.Social.Application.Events;
 
 /// <summary>Publishes the public integration events of the Social module (saved in its Outbox).</summary>
-internal sealed class FriendRequestSentHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<FriendRequestSentDomainEvent>
+internal sealed class UserFollowedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<UserFollowedDomainEvent>
 {
-    public Task Handle(FriendRequestSentDomainEvent domainEvent, CancellationToken cancellationToken)
+    public Task Handle(UserFollowedDomainEvent domainEvent, CancellationToken cancellationToken)
     {
-        publisher.Publish(new FriendRequestSent(domainEvent.RequestId, domainEvent.RequesterId, domainEvent.AddresseeId, timeProvider.GetUtcNow()));
+        publisher.Publish(new UserFollowed(domainEvent.FollowerId, domainEvent.FolloweeId, timeProvider.GetUtcNow()));
         return Task.CompletedTask;
     }
 }
 
-internal sealed class FriendRequestAcceptedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<FriendRequestAcceptedDomainEvent>
+internal sealed class FollowRequestedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<FollowRequestedDomainEvent>
 {
-    public Task Handle(FriendRequestAcceptedDomainEvent domainEvent, CancellationToken cancellationToken)
+    public Task Handle(FollowRequestedDomainEvent domainEvent, CancellationToken cancellationToken)
     {
-        publisher.Publish(new FriendRequestAccepted(domainEvent.RequestId, domainEvent.RequesterId, domainEvent.AddresseeId, timeProvider.GetUtcNow()));
+        publisher.Publish(new FollowRequested(domainEvent.RequestId, domainEvent.RequesterId, domainEvent.TargetId, timeProvider.GetUtcNow()));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FollowRequestAcceptedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<FollowRequestAcceptedDomainEvent>
+{
+    public Task Handle(FollowRequestAcceptedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        publisher.Publish(new FollowRequestAccepted(domainEvent.RequestId, domainEvent.RequesterId, domainEvent.TargetId, timeProvider.GetUtcNow()));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FriendshipStartedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<FriendshipStartedDomainEvent>
+{
+    public Task Handle(FriendshipStartedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        publisher.Publish(new FriendshipStarted(domainEvent.UserAId, domainEvent.UserBId, timeProvider.GetUtcNow()));
         return Task.CompletedTask;
     }
 }
@@ -43,13 +61,44 @@ internal sealed class UserBlockedHandler(IIntegrationEventPublisher publisher, T
     }
 }
 
+/// <summary>A profile that becomes public has no one left to ask: those waiting become followers.</summary>
+internal sealed class AcceptRequestsOnProfilePublic(
+    IFollowRequestRepository requests,
+    FollowService followService,
+    ISocialGraphCache graphs,
+    ISocialUnitOfWork unitOfWork,
+    TimeProvider timeProvider) : IIntegrationEventHandler<UserPrivacyChanged>
+{
+    public async Task Handle(UserPrivacyChanged integrationEvent, CancellationToken cancellationToken)
+    {
+        if (integrationEvent.IsPrivate)
+        {
+            return;
+        }
+
+        var pending = await requests.GetAllPendingForAsync(integrationEvent.UserId, cancellationToken);
+        foreach (var request in pending)
+        {
+            request.Accept(timeProvider.GetUtcNow());
+            await followService.StartAsync(request.RequesterId, request.TargetId, cancellationToken);
+        }
+
+        // Saved here, and not by the dispatcher, so that the graphs are read again after the change.
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        foreach (var request in pending)
+        {
+            await graphs.InvalidateAsync(request.RequesterId, request.TargetId, cancellationToken);
+        }
+    }
+}
+
 /// <summary>
 /// Erases everything that links a deleted account to other people. Their cached graphs can still
 /// list that account for a few minutes, which is harmless because it no longer exists.
 /// </summary>
 internal sealed class DeleteSocialDataOnUserDeleted(
-    IFriendRequestRepository requests,
-    IFriendshipRepository friendships,
+    IFollowRequestRepository requests,
+    IFollowRepository follows,
     IUserBlockRepository blocks,
     IReportRepository reports) : IIntegrationEventHandler<UserDeleted>
 {
@@ -61,10 +110,9 @@ internal sealed class DeleteSocialDataOnUserDeleted(
             requests.Remove(request);
         }
 
-        foreach (var friendship in await friendships.GetAllOfUserAsync(userId, cancellationToken))
+        foreach (var follow in await follows.GetAllOfUserAsync(userId, cancellationToken))
         {
-            friendship.End();
-            friendships.Remove(friendship);
+            follows.Remove(follow);
         }
 
         foreach (var block in await blocks.GetAllOfUserAsync(userId, cancellationToken))

@@ -97,15 +97,45 @@ namespace GeoWoof.Modules.Social.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", "social");
                 });
 
-            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.FriendRequest", b =>
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Follow", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("AddresseeId")
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("FolloweeId")
                         .HasColumnType("uuid")
-                        .HasColumnName("addressee_id");
+                        .HasColumnName("followee_id");
+
+                    b.Property<Guid>("FollowerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("follower_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_follows");
+
+                    b.HasIndex("FollowerId", "FolloweeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_follows_follower_id_followee_id");
+
+                    b.HasIndex("FolloweeId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_follows_followee_id_created_at_id");
+
+                    b.HasIndex("FollowerId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_follows_follower_id_created_at_id");
+
+                    b.ToTable("follows", "social");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.FollowRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -125,60 +155,25 @@ namespace GeoWoof.Modules.Social.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("status");
 
-                    b.Property<Guid>("UserHighId")
+                    b.Property<Guid>("TargetId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_high_id");
-
-                    b.Property<Guid>("UserLowId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_low_id");
+                        .HasColumnName("target_id");
 
                     b.HasKey("Id")
-                        .HasName("pk_friend_requests");
+                        .HasName("pk_follow_requests");
 
-                    b.HasIndex("UserLowId", "UserHighId")
+                    b.HasIndex("RequesterId", "TargetId")
                         .IsUnique()
-                        .HasDatabaseName("ix_friend_requests_user_low_id_user_high_id")
+                        .HasDatabaseName("ix_follow_requests_requester_id_target_id")
                         .HasFilter("status = 'Pending'");
 
-                    b.HasIndex("AddresseeId", "Status", "CreatedAt", "Id")
-                        .HasDatabaseName("ix_friend_requests_addressee_id_status_created_at_id");
-
                     b.HasIndex("RequesterId", "Status", "CreatedAt", "Id")
-                        .HasDatabaseName("ix_friend_requests_requester_id_status_created_at_id");
+                        .HasDatabaseName("ix_follow_requests_requester_id_status_created_at_id");
 
-                    b.ToTable("friend_requests", "social");
-                });
+                    b.HasIndex("TargetId", "Status", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_follow_requests_target_id_status_created_at_id");
 
-            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Friendship", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("UserAId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_a_id");
-
-                    b.Property<Guid>("UserBId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_b_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_friendships");
-
-                    b.HasIndex("UserBId")
-                        .HasDatabaseName("ix_friendships_user_b_id");
-
-                    b.HasIndex("UserAId", "UserBId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_friendships_user_a_id_user_b_id");
-
-                    b.ToTable("friendships", "social");
+                    b.ToTable("follow_requests", "social");
                 });
 
             modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Report", b =>

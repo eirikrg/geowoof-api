@@ -22,6 +22,8 @@ public sealed record UserProfileChangedDomainEvent(Guid UserId, string? Username
 
 public sealed record UserDeletedDomainEvent(Guid UserId) : IDomainEvent;
 
+public sealed record UserPrivacyChangedDomainEvent(Guid UserId, bool IsPrivate) : IDomainEvent;
+
 /// <summary>
 /// A GeoWoof account: credentials (password hash, external logins), email verification, sign-in
 /// throttling and the public identity (username and display name). Sessions and verification codes
@@ -67,6 +69,9 @@ public sealed class User : AggregateRoot
 
     /// <summary>Image in the Media module.</summary>
     public Guid? AvatarAssetId { get; private set; }
+
+    /// <summary>A private profile only shows its content to those who follow it, and following it needs a yes.</summary>
+    public bool IsPrivate { get; private set; }
 
     public Language Language { get; private set; }
 
@@ -190,6 +195,15 @@ public sealed class User : AggregateRoot
         Bio = string.IsNullOrWhiteSpace(bio) ? null : bio.Trim();
         City = string.IsNullOrWhiteSpace(city) ? null : city.Trim();
         AvatarAssetId = avatarAssetId;
+    }
+
+    public void SetPrivate(bool isPrivate)
+    {
+        if (isPrivate != IsPrivate)
+        {
+            IsPrivate = isPrivate;
+            Raise(new UserPrivacyChangedDomainEvent(Id, isPrivate));
+        }
     }
 
     /// <summary>Marks the account for deletion; the repository removes it in the same unit of work.</summary>

@@ -1,6 +1,5 @@
 using GeoWoof.BuildingBlocks.Application;
 using GeoWoof.Modules.Social.Application.Abstractions;
-using GeoWoof.Modules.Social.Application.Friends;
 using GeoWoof.Modules.Social.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,7 +13,8 @@ public static class SocialApplication
         services.AddApplicationHandlers(typeof(SocialApplication).Assembly);
         services.AddScoped<IRelationshipsApi, RelationshipsApi>();
         services.AddScoped<UserSummaries>();
-        services.AddScoped<FriendRequestAcceptance>();
+        services.AddScoped<RelationshipReader>();
+        services.AddScoped<FollowService>();
         return services;
     }
 }
@@ -28,13 +28,19 @@ internal sealed class RelationshipsApi(ISocialGraphCache graphs) : IRelationship
             return Relationship.Self;
         }
 
-        var graph = await graphs.GetAsync(viewerId, cancellationToken);
-        if (graph.IsBlockedEitherWay(targetId))
+        var mine = await graphs.GetAsync(viewerId, cancellationToken);
+        if (mine.IsBlockedEitherWay(targetId))
         {
             return Relationship.Blocked;
         }
 
-        return graph.Friends.Contains(targetId) ? Relationship.Friend : Relationship.None;
+        if (!mine.Following.Contains(targetId))
+        {
+            return Relationship.None;
+        }
+
+        var theirs = await graphs.GetAsync(targetId, cancellationToken);
+        return theirs.Following.Contains(viewerId) ? Relationship.Friend : Relationship.Follower;
     }
 
     public async Task<IReadOnlyCollection<Guid>> GetHiddenUserIdsAsync(Guid userId, CancellationToken cancellationToken)
@@ -42,4 +48,7 @@ internal sealed class RelationshipsApi(ISocialGraphCache graphs) : IRelationship
         var graph = await graphs.GetAsync(userId, cancellationToken);
         return graph.Blocked.Union(graph.BlockedBy).ToList();
     }
+
+    public async Task<IReadOnlyCollection<Guid>> GetFollowingIdsAsync(Guid userId, CancellationToken cancellationToken) =>
+        (await graphs.GetAsync(userId, cancellationToken)).Following;
 }

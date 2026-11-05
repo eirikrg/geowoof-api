@@ -42,8 +42,9 @@ internal sealed class SearchUsersQueryHandler(IUserRepository users, IRelationsh
         }
 
         var hidden = await relationships.GetHiddenUserIdsAsync(query.ViewerId, cancellationToken);
+        var following = await relationships.GetFollowingIdsAsync(query.ViewerId, cancellationToken);
         var limit = PageLimit.Normalize(query.Limit);
-        var hits = await users.SearchAsync(query.Q.Trim(), [.. hidden, query.ViewerId], after, limit + 1, cancellationToken);
+        var hits = await users.SearchAsync(query.Q.Trim(), [.. hidden, query.ViewerId], following, after, limit + 1, cancellationToken);
         var page = hits.Take(limit).ToList();
         var next = hits.Count > limit ? RelevanceCursor.Encode(page[^1]) : null;
 
@@ -52,12 +53,16 @@ internal sealed class SearchUsersQueryHandler(IUserRepository users, IRelationsh
         var items = page
             .Where(hit => found.ContainsKey(hit.Id))
             .Select(hit => found[hit.Id])
-            .Select(user => new UserSummaryDto(
-                user.Id,
-                user.Username!.Value,
-                user.DisplayName,
-                user.City,
-                user.AvatarAssetId is { } assetId ? images.GetValueOrDefault(assetId) : null))
+            .Select(user =>
+            {
+                var isRestricted = user.IsPrivate && !following.Contains(user.Id);
+                return new UserSummaryDto(
+                    user.Id,
+                    user.Username!.Value,
+                    isRestricted ? user.Username!.Value : user.DisplayName,
+                    isRestricted ? null : user.City,
+                    user.AvatarAssetId is { } assetId ? images.GetValueOrDefault(assetId) : null);
+            })
             .ToList();
         return new PagedResponse<UserSummaryDto>(items, next);
     }
