@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace GeoWoof.Modules.Social.Infrastructure.Persistence;
 
-/// <summary>Schema <c>social</c>: follows, follow requests, blocks and reports.</summary>
+/// <summary>Schema <c>social</c>: follows, follow requests, blocks, reports, posts and what people do with them.</summary>
 public sealed class SocialDbContext(DbContextOptions<SocialDbContext> options) : ModuleDbContext(options), ISocialUnitOfWork
 {
     public const string SchemaName = "social";
@@ -22,6 +22,22 @@ public sealed class SocialDbContext(DbContextOptions<SocialDbContext> options) :
 
     public DbSet<Report> Reports => Set<Report>();
 
+    public DbSet<Post> Posts => Set<Post>();
+
+    public DbSet<PostPet> PostPets => Set<PostPet>();
+
+    public DbSet<PostMention> PostMentions => Set<PostMention>();
+
+    public DbSet<PostLike> PostLikes => Set<PostLike>();
+
+    public DbSet<Comment> Comments => Set<Comment>();
+
+    public DbSet<CommentMention> CommentMentions => Set<CommentMention>();
+
+    public DbSet<Repost> Reposts => Set<Repost>();
+
+    public DbSet<SavedPost> SavedPosts => Set<SavedPost>();
+
     public void DiscardChanges() => ChangeTracker.Clear();
 
     protected override void ConfigureModule(ModelBuilder modelBuilder)
@@ -30,6 +46,15 @@ public sealed class SocialDbContext(DbContextOptions<SocialDbContext> options) :
         modelBuilder.ApplyConfiguration(new FollowRequestConfiguration());
         modelBuilder.ApplyConfiguration(new UserBlockConfiguration());
         modelBuilder.ApplyConfiguration(new ReportConfiguration());
+        modelBuilder.ApplyConfiguration(new PostConfiguration());
+        modelBuilder.ApplyConfiguration(new PostMediaConfiguration());
+        modelBuilder.ApplyConfiguration(new PostPetConfiguration());
+        modelBuilder.ApplyConfiguration(new PostMentionConfiguration());
+        modelBuilder.ApplyConfiguration(new PostLikeConfiguration());
+        modelBuilder.ApplyConfiguration(new CommentConfiguration());
+        modelBuilder.ApplyConfiguration(new CommentMentionConfiguration());
+        modelBuilder.ApplyConfiguration(new RepostConfiguration());
+        modelBuilder.ApplyConfiguration(new SavedPostConfiguration());
     }
 }
 
@@ -146,6 +171,12 @@ internal sealed class FollowRepository(SocialDbContext dbContext) : IFollowRepos
             .Select(row => new PersonRow(row.UserId, row.Since, row.Id))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyCollection<Guid>> GetFollowersAmongAsync(Guid userId, IReadOnlyCollection<Guid> candidateIds, CancellationToken cancellationToken) =>
+        await dbContext.Follows.AsNoTracking()
+            .Where(follow => follow.FolloweeId == userId && candidateIds.Contains(follow.FollowerId))
+            .Select(follow => follow.FollowerId)
+            .ToListAsync(cancellationToken);
 
     public async Task<SocialCounts> GetCountsAsync(Guid userId, CancellationToken cancellationToken)
     {

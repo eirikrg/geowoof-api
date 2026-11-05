@@ -32,6 +32,12 @@ internal sealed class FakeFollows : IFollowRepository
         return Task.FromResult(found);
     }
 
+    public Task<IReadOnlyCollection<Guid>> GetFollowersAmongAsync(Guid userId, IReadOnlyCollection<Guid> candidateIds, CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<Guid> found = Items.Where(follow => follow.FolloweeId == userId && candidateIds.Contains(follow.FollowerId)).Select(follow => follow.FollowerId).ToList();
+        return Task.FromResult(found);
+    }
+
     public Task<SocialCounts> GetCountsAsync(Guid userId, CancellationToken cancellationToken) => Task.FromResult(new SocialCounts(
         Items.Count(follow => follow.FolloweeId == userId),
         Items.Count(follow => follow.FollowerId == userId),
@@ -192,6 +198,12 @@ internal sealed class FakeIdentity : IIdentityApi
         IReadOnlyDictionary<Guid, UserSummary> found = userIds.Distinct().Where(Users.ContainsKey).ToDictionary(id => id, id => Users[id]);
         return Task.FromResult(found);
     }
+
+    public Task<IReadOnlyDictionary<string, UserSummary>> GetPublicUsersByUsernameAsync(IReadOnlyCollection<string> usernames, CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<string, UserSummary> found = Users.Values.Where(user => usernames.Contains(user.Username)).ToDictionary(user => user.Username, StringComparer.Ordinal);
+        return Task.FromResult(found);
+    }
 }
 
 internal sealed class FakeMedia : IMediaApi
@@ -208,5 +220,102 @@ internal sealed class FakeMedia : IMediaApi
     {
         IReadOnlyDictionary<Guid, MediaImage> empty = new Dictionary<Guid, MediaImage>();
         return Task.FromResult(empty);
+    }
+}
+
+/// <summary>What the handlers of follows, blocks and reports use of the posts. The rest is tested against PostgreSQL.</summary>
+internal sealed class FakePosts : IPostRepository
+{
+    public List<Guid> ContentRemovedOf { get; } = [];
+
+    public Task<Post?> GetAsync(Guid postId, CancellationToken cancellationToken) => Task.FromResult<Post?>(null);
+
+    public Task<Post?> GetVisibleAsync(Guid postId, PostAudience audience, CancellationToken cancellationToken) => Task.FromResult<Post?>(null);
+
+    public Task<IReadOnlyList<Post>> GetWithDetailsAsync(IReadOnlyCollection<Guid> postIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Post>>([]);
+
+    public Task<IReadOnlyDictionary<Guid, PostStats>> GetStatsAsync(IReadOnlyCollection<Guid> postIds, Guid viewerId, IReadOnlyCollection<Guid> hiddenIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, PostStats>>(new Dictionary<Guid, PostStats>());
+
+    public Task<IReadOnlyList<TimelineRow>> GetFeedPageAsync(PostAudience audience, SocialPosition? after, int take, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<TimelineRow>>([]);
+
+    public Task<IReadOnlyList<TimelineRow>> GetUserPageAsync(Guid userId, PostAudience audience, SocialPosition? after, int take, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<TimelineRow>>([]);
+
+    public Task<IReadOnlyList<PostPageRow>> GetExplorePageAsync(PostAudience audience, SocialPosition? after, int take, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<PostPageRow>>([]);
+
+    public Task<IReadOnlyList<PostPageRow>> GetSavedPageAsync(PostAudience audience, SocialPosition? after, int take, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<PostPageRow>>([]);
+
+    public Task SetAuthorPrivacyAsync(Guid authorId, bool isPrivate, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task RemovePetAsync(Guid petId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task RemoveContentOfUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        ContentRemovedOf.Add(userId);
+        return Task.CompletedTask;
+    }
+
+    public void Add(Post post)
+    {
+    }
+
+    public void Remove(Post post)
+    {
+    }
+}
+
+internal sealed class FakePostActions : IPostActionRepository
+{
+    public List<Repost> Reposts { get; } = [];
+
+    public Task<PostLike?> GetLikeAsync(Guid postId, Guid userId, CancellationToken cancellationToken) => Task.FromResult<PostLike?>(null);
+
+    public Task<Repost?> GetRepostAsync(Guid postId, Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(Reposts.Find(repost => repost.PostId == postId && repost.UserId == userId));
+
+    public Task<SavedPost?> GetSavedAsync(Guid postId, Guid userId, CancellationToken cancellationToken) => Task.FromResult<SavedPost?>(null);
+
+    public Task<IReadOnlyList<Repost>> GetRepostsBetweenAsync(Guid first, Guid second, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Repost>>(Reposts.ToList());
+
+    public void Add(PostLike like)
+    {
+    }
+
+    public void Remove(PostLike like)
+    {
+    }
+
+    public void Add(Repost repost) => Reposts.Add(repost);
+
+    public void Remove(Repost repost) => Reposts.Remove(repost);
+
+    public void Add(SavedPost saved)
+    {
+    }
+
+    public void Remove(SavedPost saved)
+    {
+    }
+}
+
+internal sealed class FakeComments : ICommentRepository
+{
+    public Task<Comment?> GetAsync(Guid commentId, CancellationToken cancellationToken) => Task.FromResult<Comment?>(null);
+
+    public Task<IReadOnlyList<Comment>> GetPageAsync(Guid postId, IReadOnlyCollection<Guid> hiddenIds, SocialPosition? after, int take, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Comment>>([]);
+
+    public void Add(Comment comment)
+    {
+    }
+
+    public void Remove(Comment comment)
+    {
     }
 }

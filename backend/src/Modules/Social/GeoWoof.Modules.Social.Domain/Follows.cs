@@ -182,6 +182,8 @@ public sealed class UserBlock : AggregateRoot
 public enum ReportTargetType
 {
     User = 0,
+    Post = 1,
+    Comment = 2,
 }
 
 public enum ReportReason

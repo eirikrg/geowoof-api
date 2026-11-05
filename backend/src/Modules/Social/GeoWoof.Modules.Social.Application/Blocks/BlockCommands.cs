@@ -8,13 +8,14 @@ using GeoWoof.Modules.Social.Domain;
 
 namespace GeoWoof.Modules.Social.Application.Blocks;
 
-/// <summary>Also removes the follows and the pending requests, in both directions.</summary>
+/// <summary>Also removes the follows, the pending requests and the reposts of each other, in both directions.</summary>
 public sealed record BlockUserCommand(Guid BlockerId, Guid UserId) : ICommand;
 
 internal sealed class BlockUserCommandHandler(
     IUserBlockRepository blocks,
     IFollowRepository follows,
     IFollowRequestRepository requests,
+    IPostActionRepository postActions,
     IIdentityApi identity,
     ISocialGraphCache graphs,
     ISocialUnitOfWork unitOfWork,
@@ -41,6 +42,10 @@ internal sealed class BlockUserCommandHandler(
         await RemoveFollowsAsync(command, cancellationToken);
         await RemovePendingAsync(command.BlockerId, command.UserId, cancellationToken);
         await RemovePendingAsync(command.UserId, command.BlockerId, cancellationToken);
+        foreach (var repost in await postActions.GetRepostsBetweenAsync(command.BlockerId, command.UserId, cancellationToken))
+        {
+            postActions.Remove(repost);
+        }
 
         var now = timeProvider.GetUtcNow();
         blocks.Add(UserBlock.Create(Guid.CreateVersion7(now), command.BlockerId, command.UserId, now));

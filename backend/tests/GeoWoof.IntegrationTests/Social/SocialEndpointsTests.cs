@@ -797,7 +797,7 @@ public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
         using var second = await ana.Client.PostJsonAsync("/api/v1/reports", new { targetType = "User", targetId = bea.Id, reason = "Spam" });
         using var nobody = await ana.Client.PostJsonAsync("/api/v1/reports", new { targetType = "User", targetId = Guid.CreateVersion7(), reason = "Spam" });
         using var badReason = await ana.Client.PostJsonAsync("/api/v1/reports", new { targetType = "User", targetId = bea.Id, reason = "Rude" });
-        using var badType = await ana.Client.PostJsonAsync("/api/v1/reports", new { targetType = "Post", targetId = bea.Id, reason = "Spam" });
+        using var badType = await ana.Client.PostJsonAsync("/api/v1/reports", new { targetType = "Walk", targetId = bea.Id, reason = "Spam" });
 
         first.StatusCode.ShouldBe(HttpStatusCode.Created);
         second.StatusCode.ShouldBe(HttpStatusCode.OK);

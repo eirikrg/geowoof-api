@@ -56,6 +56,8 @@ public static class SocialEndpoints
             .Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status404NotFound).ProducesProblem(StatusCodes.Status422UnprocessableEntity);
         blocks.MapDelete("/{userId:guid}", UnblockAsync).Produces(StatusCodes.Status204NoContent);
 
+        api.MapPostEndpoints();
+
         api.MapPost("/reports", CreateReportAsync).WithTags("Reports")
             .RequireRateLimiting(RateLimitPolicies.SocialWrites)
             .Produces<ReportDto>().Produces<ReportDto>(StatusCodes.Status201Created)

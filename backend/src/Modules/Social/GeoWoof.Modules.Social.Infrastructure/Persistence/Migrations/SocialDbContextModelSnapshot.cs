@@ -97,6 +97,67 @@ namespace GeoWoof.Modules.Social.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", "social");
                 });
 
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Comment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_comments");
+
+                    b.HasIndex("AuthorId")
+                        .HasDatabaseName("ix_comments_author_id");
+
+                    b.HasIndex("PostId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_comments_post_id_created_at_id");
+
+                    b.ToTable("comments", "social");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.CommentMention", b =>
+                {
+                    b.Property<Guid>("CommentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("comment_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("username");
+
+                    b.HasKey("CommentId", "UserId")
+                        .HasName("pk_comment_mentions");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_comment_mentions_user_id");
+
+                    b.ToTable("comment_mentions", "social");
+                });
+
             modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Follow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -176,6 +237,149 @@ namespace GeoWoof.Modules.Social.Infrastructure.Persistence.Migrations
                     b.ToTable("follow_requests", "social");
                 });
 
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Post", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<bool>("AuthorIsPrivate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("author_is_private");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("text");
+
+                    b.Property<string>("Visibility")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("visibility");
+
+                    b.HasKey("Id")
+                        .HasName("pk_posts");
+
+                    b.HasIndex("CreatedAt", "Id")
+                        .HasDatabaseName("ix_posts_explore")
+                        .HasFilter("visibility = 'Everyone' AND NOT author_is_private");
+
+                    b.HasIndex("AuthorId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_posts_author_id_created_at_id");
+
+                    b.ToTable("posts", "social");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.PostLike", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_post_likes");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_post_likes_user_id");
+
+                    b.HasIndex("PostId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_post_likes_post_id_user_id");
+
+                    b.ToTable("post_likes", "social");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.PostMedia", b =>
+                {
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("asset_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("type");
+
+                    b.HasKey("PostId", "Position")
+                        .HasName("pk_post_media");
+
+                    b.ToTable("post_media", "social");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.PostMention", b =>
+                {
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("username");
+
+                    b.HasKey("PostId", "UserId")
+                        .HasName("pk_post_mentions");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_post_mentions_user_id");
+
+                    b.ToTable("post_mentions", "social");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.PostPet", b =>
+                {
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pet_id");
+
+                    b.HasKey("PostId", "PetId")
+                        .HasName("pk_post_pets");
+
+                    b.HasIndex("PetId")
+                        .HasDatabaseName("ix_post_pets_pet_id");
+
+                    b.ToTable("post_pets", "social");
+                });
+
             modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Report", b =>
                 {
                     b.Property<Guid>("Id")
@@ -231,6 +435,71 @@ namespace GeoWoof.Modules.Social.Infrastructure.Persistence.Migrations
                     b.ToTable("reports", "social");
                 });
 
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Repost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reposts");
+
+                    b.HasIndex("PostId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reposts_post_id_user_id");
+
+                    b.HasIndex("UserId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_reposts_user_id_created_at_id");
+
+                    b.ToTable("reposts", "social");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.SavedPost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_saved_posts");
+
+                    b.HasIndex("PostId")
+                        .HasDatabaseName("ix_saved_posts_post_id");
+
+                    b.HasIndex("UserId", "PostId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_saved_posts_user_id_post_id");
+
+                    b.HasIndex("UserId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_saved_posts_user_id_created_at_id");
+
+                    b.ToTable("saved_posts", "social");
+                });
+
             modelBuilder.Entity("GeoWoof.Modules.Social.Domain.UserBlock", b =>
                 {
                     b.Property<Guid>("Id")
@@ -260,6 +529,100 @@ namespace GeoWoof.Modules.Social.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_user_blocks_blocker_id_blocked_id");
 
                     b.ToTable("user_blocks", "social");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Comment", b =>
+                {
+                    b.HasOne("GeoWoof.Modules.Social.Domain.Post", null)
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_comments_posts_post_id");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.CommentMention", b =>
+                {
+                    b.HasOne("GeoWoof.Modules.Social.Domain.Comment", null)
+                        .WithMany("Mentions")
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_comment_mentions_comments_comment_id");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.PostLike", b =>
+                {
+                    b.HasOne("GeoWoof.Modules.Social.Domain.Post", null)
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_post_likes_posts_post_id");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.PostMedia", b =>
+                {
+                    b.HasOne("GeoWoof.Modules.Social.Domain.Post", null)
+                        .WithMany("Media")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_post_media_posts_post_id");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.PostMention", b =>
+                {
+                    b.HasOne("GeoWoof.Modules.Social.Domain.Post", null)
+                        .WithMany("Mentions")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_post_mentions_posts_post_id");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.PostPet", b =>
+                {
+                    b.HasOne("GeoWoof.Modules.Social.Domain.Post", null)
+                        .WithMany("Pets")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_post_pets_posts_post_id");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Repost", b =>
+                {
+                    b.HasOne("GeoWoof.Modules.Social.Domain.Post", null)
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_reposts_posts_post_id");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.SavedPost", b =>
+                {
+                    b.HasOne("GeoWoof.Modules.Social.Domain.Post", null)
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_saved_posts_posts_post_id");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Comment", b =>
+                {
+                    b.Navigation("Mentions");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Post", b =>
+                {
+                    b.Navigation("Media");
+
+                    b.Navigation("Mentions");
+
+                    b.Navigation("Pets");
                 });
 #pragma warning restore 612, 618
         }

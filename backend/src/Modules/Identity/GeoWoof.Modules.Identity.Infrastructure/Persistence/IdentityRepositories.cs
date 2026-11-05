@@ -27,6 +27,9 @@ internal sealed class UserRepository(IdentityDbContext dbContext) : IUserReposit
     public Task<bool> UsernameExistsAsync(Username username, CancellationToken cancellationToken) =>
         dbContext.Users.AnyAsync(user => user.Username == username, cancellationToken);
 
+    public async Task<IReadOnlyList<User>> GetPublicByUsernamesAsync(IReadOnlyCollection<Username> usernames, CancellationToken cancellationToken) =>
+        await dbContext.Users.AsNoTracking().Where(user => user.Username != null && usernames.Contains(user.Username)).ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<User>> GetPublicByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken) =>
         await dbContext.Users.AsNoTracking().Where(user => userIds.Contains(user.Id) && user.Username != null).ToListAsync(cancellationToken);
 

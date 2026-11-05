@@ -5,6 +5,7 @@
     <ProjectReference Include="..\GeoWoof.Modules.Social.Contracts\GeoWoof.Modules.Social.Contracts.csproj" />
     <ProjectReference Include="..\..\Identity\GeoWoof.Modules.Identity.Contracts\GeoWoof.Modules.Identity.Contracts.csproj" />
     <ProjectReference Include="..\..\Media\GeoWoof.Modules.Media.Contracts\GeoWoof.Modules.Media.Contracts.csproj" />
+    <ProjectReference Include="..\..\Pets\GeoWoof.Modules.Pets.Contracts\GeoWoof.Modules.Pets.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="GeoWoof.Modules.Social.Infrastructure" />

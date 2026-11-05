@@ -21,6 +21,9 @@ public static class SocialModule
         services.AddScoped<IFollowRequestRepository, FollowRequestRepository>();
         services.AddScoped<IUserBlockRepository, UserBlockRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
+        services.AddScoped<IPostRepository, PostRepository>();
+        services.AddScoped<IPostActionRepository, PostActionRepository>();
+        services.AddScoped<ICommentRepository, CommentRepository>();
         services.AddScoped<ISocialGraphStore, SocialGraphStore>();
         services.AddScoped<ISocialGraphCache, HybridSocialGraphCache>();
         services.AddScoped<IDevelopmentDataSeeder, SocialDevelopmentSeeder>();

@@ -44,6 +44,15 @@ public static class VisibilityRules
             _ => visibility is ContentVisibility.Everyone,
         };
 
+    /// <summary>
+    /// A repost shows something to more people, so it has to be visible to whoever does it, and its author has
+    /// to be a friend or have a public profile. Those who see the repost are still decided by <see cref="CanSee"/>.
+    /// </summary>
+    public static bool CanRepost(ViewerRelation viewer, ContentVisibility visibility, bool isPrivateProfile) =>
+        viewer != ViewerRelation.Owner
+        && CanSee(viewer, visibility, isPrivateProfile)
+        && (viewer == ViewerRelation.Friend || !isPrivateProfile);
+
     /// <summary>The same rule for a query, which filters by the visibilities that this viewer can see.</summary>
     public static IReadOnlyList<ContentVisibility> VisibleTo(ViewerRelation viewer, bool isPrivateProfile) =>
         Enum.GetValues<ContentVisibility>().Where(visibility => CanSee(viewer, visibility, isPrivateProfile)).ToList();

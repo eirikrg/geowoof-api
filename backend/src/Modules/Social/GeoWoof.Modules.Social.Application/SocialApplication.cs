@@ -1,5 +1,6 @@
 using GeoWoof.BuildingBlocks.Application;
 using GeoWoof.Modules.Social.Application.Abstractions;
+using GeoWoof.Modules.Social.Application.Posts;
 using GeoWoof.Modules.Social.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,6 +16,8 @@ public static class SocialApplication
         services.AddScoped<UserSummaries>();
         services.AddScoped<RelationshipReader>();
         services.AddScoped<FollowService>();
+        services.AddScoped<PostAssembler>();
+        services.AddScoped<MentionResolver>();
         return services;
     }
 }

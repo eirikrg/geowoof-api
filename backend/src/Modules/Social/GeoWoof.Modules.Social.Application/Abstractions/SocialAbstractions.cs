@@ -34,6 +34,9 @@ public interface IFollowRepository
 
     Task<SocialCounts> GetCountsAsync(Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>Which of these people follow this one.</summary>
+    Task<IReadOnlyCollection<Guid>> GetFollowersAmongAsync(Guid userId, IReadOnlyCollection<Guid> candidateIds, CancellationToken cancellationToken);
+
     /// <summary>In both directions.</summary>
     Task<IReadOnlyList<Follow>> GetAllOfUserAsync(Guid userId, CancellationToken cancellationToken);
 

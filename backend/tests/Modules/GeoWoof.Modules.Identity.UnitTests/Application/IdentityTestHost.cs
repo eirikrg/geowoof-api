@@ -173,6 +173,9 @@ internal sealed class InMemoryUsers : IUserRepository
     public Task<bool> UsernameExistsAsync(Username username, CancellationToken cancellationToken) =>
         Task.FromResult(Items.Exists(user => user.Username == username));
 
+    public Task<IReadOnlyList<User>> GetPublicByUsernamesAsync(IReadOnlyCollection<Username> usernames, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<User>>(Items.Where(user => user.Username is not null && usernames.Contains(user.Username)).ToList());
+
     public Task<IReadOnlyList<User>> GetPublicByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<User>>(Items.Where(user => userIds.Contains(user.Id) && user.HasCompletedOnboarding).ToList());
 

@@ -12,5 +12,15 @@ internal sealed class IdentityApi(IUserRepository users) : IIdentityApi
     public async Task<IReadOnlyDictionary<Guid, UserSummary>> GetPublicUsersAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken) =>
         (await users.GetPublicByIdsAsync(userIds, cancellationToken)).ToDictionary(
             user => user.Id,
-            user => new UserSummary(user.Id, user.Username!.Value, user.DisplayName, user.City, user.AvatarAssetId, user.IsPrivate));
+            ToSummary);
+
+    public async Task<IReadOnlyDictionary<string, UserSummary>> GetPublicUsersByUsernameAsync(IReadOnlyCollection<string> usernames, CancellationToken cancellationToken)
+    {
+        var valid = usernames.Where(username => Username.Check(username) == UsernameCheck.Valid).Select(Username.FromStorage).ToList();
+        var found = await users.GetPublicByUsernamesAsync(valid, cancellationToken);
+        return found.ToDictionary(user => user.Username!.Value, ToSummary, StringComparer.Ordinal);
+    }
+
+    private static UserSummary ToSummary(User user) =>
+        new(user.Id, user.Username!.Value, user.DisplayName, user.City, user.AvatarAssetId, user.IsPrivate);
 }

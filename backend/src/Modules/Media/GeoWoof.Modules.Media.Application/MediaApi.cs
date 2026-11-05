@@ -98,6 +98,7 @@ internal sealed class MediaApi(
         MediaUsage.UserAvatar => MediaPurpose.UserAvatar,
         MediaUsage.PetAvatar => MediaPurpose.PetAvatar,
         MediaUsage.WalkPhoto => MediaPurpose.WalkPhoto,
+        MediaUsage.PostImage => MediaPurpose.PostImage,
         _ => throw new ArgumentOutOfRangeException(nameof(usage), usage, "Unknown media usage."),
     };
 }

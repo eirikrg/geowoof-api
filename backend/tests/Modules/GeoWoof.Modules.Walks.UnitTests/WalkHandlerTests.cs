@@ -636,6 +636,9 @@ internal sealed class FakePets : IPetsApi
 
     public Task<IReadOnlyList<Guid>> GetPetIdsAsync(Guid ownerId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<Guid>>(Owners.Where(pair => pair.Value == ownerId).Select(pair => pair.Key).ToList());
+
+    public Task<IReadOnlyDictionary<Guid, PetSummary>> GetPetsAsync(IReadOnlyCollection<Guid> petIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, PetSummary>>(new Dictionary<Guid, PetSummary>());
 }
 
 internal sealed class FakeMedia : IMediaApi
@@ -756,6 +759,12 @@ internal sealed class FakeIdentity : IIdentityApi
     public Task<IReadOnlyDictionary<Guid, UserSummary>> GetPublicUsersAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken)
     {
         IReadOnlyDictionary<Guid, UserSummary> found = userIds.Distinct().Where(Users.ContainsKey).ToDictionary(id => id, id => Users[id]);
+        return Task.FromResult(found);
+    }
+
+    public Task<IReadOnlyDictionary<string, UserSummary>> GetPublicUsersByUsernameAsync(IReadOnlyCollection<string> usernames, CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<string, UserSummary> found = Users.Values.Where(user => usernames.Contains(user.Username)).ToDictionary(user => user.Username, StringComparer.Ordinal);
         return Task.FromResult(found);
     }
 }

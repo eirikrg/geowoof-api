@@ -497,4 +497,10 @@ internal sealed class FakeIdentity : IIdentityApi
         IReadOnlyDictionary<Guid, UserSummary> found = userIds.Distinct().Where(Users.ContainsKey).ToDictionary(id => id, id => Users[id]);
         return Task.FromResult(found);
     }
+
+    public Task<IReadOnlyDictionary<string, UserSummary>> GetPublicUsersByUsernameAsync(IReadOnlyCollection<string> usernames, CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<string, UserSummary> found = Users.Values.Where(user => usernames.Contains(user.Username)).ToDictionary(user => user.Username, StringComparer.Ordinal);
+        return Task.FromResult(found);
+    }
 }

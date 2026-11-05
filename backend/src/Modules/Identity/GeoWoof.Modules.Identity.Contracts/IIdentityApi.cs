@@ -15,4 +15,7 @@ public interface IIdentityApi
 
     /// <summary>Those accounts that exist and have finished the onboarding. It knows nothing about blocks.</summary>
     Task<IReadOnlyDictionary<Guid, UserSummary>> GetPublicUsersAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
+
+    /// <summary>The same, by their lower-cased usernames, for the mentions of a text. Those that are not valid are left out.</summary>
+    Task<IReadOnlyDictionary<string, UserSummary>> GetPublicUsersByUsernameAsync(IReadOnlyCollection<string> usernames, CancellationToken cancellationToken);
 }

@@ -10,4 +10,9 @@ internal sealed class PetsApi(IPetRepository pets) : IPetsApi
 
     public async Task<IReadOnlyList<Guid>> GetPetIdsAsync(Guid ownerId, CancellationToken cancellationToken) =>
         (await pets.GetByOwnerAsync(ownerId, cancellationToken)).Select(pet => pet.Id).ToList();
+
+    public async Task<IReadOnlyDictionary<Guid, PetSummary>> GetPetsAsync(IReadOnlyCollection<Guid> petIds, CancellationToken cancellationToken) =>
+        petIds.Count == 0
+            ? new Dictionary<Guid, PetSummary>()
+            : (await pets.GetByIdsAsync(petIds, cancellationToken)).ToDictionary(pet => pet.Id, pet => new PetSummary(pet.Id, pet.Name, pet.AvatarAssetId));
 }

@@ -20,6 +20,8 @@ public interface IUserRepository
     Task<bool> UsernameExistsAsync(Username username, CancellationToken cancellationToken);
 
     /// <summary>Those accounts that exist and have finished the onboarding.</summary>
+    Task<IReadOnlyList<User>> GetPublicByUsernamesAsync(IReadOnlyCollection<Username> usernames, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<User>> GetPublicByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
 
     /// <summary>

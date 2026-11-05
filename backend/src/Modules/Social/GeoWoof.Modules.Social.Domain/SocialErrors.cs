@@ -16,5 +16,21 @@ public static class SocialErrors
 
     public static readonly Error ListsPrivate = Error.Forbidden("social.lists_private", "Only this person and their friends can see this list.");
 
+    public static readonly Error ProfilePrivate = Error.Forbidden("identity.profile_private", "This profile is private.");
+
+    public static readonly Error PostNotFound = Error.NotFound("social.post_not_found", "The post does not exist.");
+
+    public static readonly Error CommentNotFound = Error.NotFound("social.comment_not_found", "The comment does not exist.");
+
+    public static readonly Error PostIdTaken = Error.Conflict("social.post_id_taken", "That id belongs to another post.");
+
+    public static readonly Error PetNotOwned = Error.Unprocessable("social.pet_not_owned", "Only your own pets can appear in your posts.");
+
+    public static readonly Error NotPostAuthor = Error.Forbidden("social.not_post_author", "Only its author can delete a post.");
+
+    public static readonly Error CannotDeleteComment = Error.Forbidden("social.cannot_delete_comment", "Only its author and the author of the post can delete a comment.");
+
+    public static readonly Error CannotRepost = Error.Forbidden("social.cannot_repost", "You can only repost what friends or public profiles publish.");
+
     public static readonly Error InvalidCursor = Error.Validation("request.invalid", "The cursor is not valid.");
 }

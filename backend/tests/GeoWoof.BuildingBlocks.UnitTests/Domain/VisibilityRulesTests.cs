@@ -57,6 +57,28 @@ public sealed class VisibilityRulesTests
         VisibilityRules.CanSeeProfileContent(viewer, isPrivateProfile).ShouldBe(expected);
     }
 
+    [Theory]
+    [InlineData(ViewerRelation.Owner, ContentVisibility.Everyone, false, false)]
+    [InlineData(ViewerRelation.Owner, ContentVisibility.Friends, false, false)]
+    [InlineData(ViewerRelation.Friend, ContentVisibility.Everyone, false, true)]
+    [InlineData(ViewerRelation.Friend, ContentVisibility.Friends, false, true)]
+    [InlineData(ViewerRelation.Friend, ContentVisibility.Everyone, true, true)]
+    [InlineData(ViewerRelation.Friend, ContentVisibility.Friends, true, true)]
+    [InlineData(ViewerRelation.Friend, ContentVisibility.OnlyMe, false, false)]
+    [InlineData(ViewerRelation.Follower, ContentVisibility.Everyone, false, true)]
+    [InlineData(ViewerRelation.Follower, ContentVisibility.Friends, false, false)]
+    [InlineData(ViewerRelation.Follower, ContentVisibility.Everyone, true, false)]
+    [InlineData(ViewerRelation.Stranger, ContentVisibility.Everyone, false, true)]
+    [InlineData(ViewerRelation.Stranger, ContentVisibility.Friends, false, false)]
+    [InlineData(ViewerRelation.Stranger, ContentVisibility.Everyone, true, false)]
+    [InlineData(ViewerRelation.Blocked, ContentVisibility.Everyone, false, false)]
+    [InlineData(ViewerRelation.Blocked, ContentVisibility.Friends, false, false)]
+    [InlineData(ViewerRelation.Blocked, ContentVisibility.Everyone, true, false)]
+    public void Only_what_a_friend_or_a_public_profile_publishes_can_be_reposted(ViewerRelation viewer, ContentVisibility visibility, bool isPrivateProfile, bool expected)
+    {
+        VisibilityRules.CanRepost(viewer, visibility, isPrivateProfile).ShouldBe(expected);
+    }
+
     [Fact]
     public void Every_combination_is_covered_by_the_tests_above()
     {

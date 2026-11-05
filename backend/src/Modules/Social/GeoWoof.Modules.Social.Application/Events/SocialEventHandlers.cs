@@ -1,5 +1,6 @@
 using GeoWoof.BuildingBlocks.Application.Events;
 using GeoWoof.Modules.Identity.Contracts;
+using GeoWoof.Modules.Pets.Contracts;
 using GeoWoof.Modules.Social.Application.Abstractions;
 using GeoWoof.Modules.Social.Contracts;
 using GeoWoof.Modules.Social.Domain;
@@ -61,6 +62,65 @@ internal sealed class UserBlockedHandler(IIntegrationEventPublisher publisher, T
     }
 }
 
+internal sealed class PostCreatedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<PostCreatedDomainEvent>
+{
+    public Task Handle(PostCreatedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        publisher.Publish(new PostCreated(domainEvent.PostId, domainEvent.AuthorId, domainEvent.Visibility.ToString(), timeProvider.GetUtcNow()));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class PostLikedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<PostLikedDomainEvent>
+{
+    public Task Handle(PostLikedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        publisher.Publish(new PostLiked(domainEvent.PostId, domainEvent.PostAuthorId, domainEvent.UserId, timeProvider.GetUtcNow()));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class CommentAddedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<CommentAddedDomainEvent>
+{
+    public Task Handle(CommentAddedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        publisher.Publish(new CommentAdded(domainEvent.CommentId, domainEvent.PostId, domainEvent.PostAuthorId, domainEvent.AuthorId, timeProvider.GetUtcNow()));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class PostRepostedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<PostRepostedDomainEvent>
+{
+    public Task Handle(PostRepostedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        publisher.Publish(new PostReposted(domainEvent.RepostId, domainEvent.PostId, domainEvent.PostAuthorId, domainEvent.UserId, timeProvider.GetUtcNow()));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class UserMentionedHandler(IIntegrationEventPublisher publisher, TimeProvider timeProvider) : IDomainEventHandler<UserMentionedDomainEvent>
+{
+    public Task Handle(UserMentionedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        publisher.Publish(new UserMentioned(domainEvent.MentionedUserId, domainEvent.AuthorId, domainEvent.PostId, domainEvent.CommentId, timeProvider.GetUtcNow()));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Keeps the copy that the queries of posts filter by.</summary>
+internal sealed class UpdatePostsOnPrivacyChanged(IPostRepository posts) : IIntegrationEventHandler<UserPrivacyChanged>
+{
+    public Task Handle(UserPrivacyChanged integrationEvent, CancellationToken cancellationToken) =>
+        posts.SetAuthorPrivacyAsync(integrationEvent.UserId, integrationEvent.IsPrivate, cancellationToken);
+}
+
+/// <summary>A post is still a memory of its author: it stays, without the deleted pet.</summary>
+internal sealed class RemovePetFromPostsOnPetDeleted(IPostRepository posts) : IIntegrationEventHandler<PetDeleted>
+{
+    public Task Handle(PetDeleted integrationEvent, CancellationToken cancellationToken) =>
+        posts.RemovePetAsync(integrationEvent.PetId, cancellationToken);
+}
+
 /// <summary>A profile that becomes public has no one left to ask: those waiting become followers.</summary>
 internal sealed class AcceptRequestsOnProfilePublic(
     IFollowRequestRepository requests,
@@ -100,7 +160,8 @@ internal sealed class DeleteSocialDataOnUserDeleted(
     IFollowRequestRepository requests,
     IFollowRepository follows,
     IUserBlockRepository blocks,
-    IReportRepository reports) : IIntegrationEventHandler<UserDeleted>
+    IReportRepository reports,
+    IPostRepository posts) : IIntegrationEventHandler<UserDeleted>
 {
     public async Task Handle(UserDeleted integrationEvent, CancellationToken cancellationToken)
     {
@@ -124,5 +185,7 @@ internal sealed class DeleteSocialDataOnUserDeleted(
         {
             reports.Remove(report);
         }
+
+        await posts.RemoveContentOfUserAsync(userId, cancellationToken);
     }
 }

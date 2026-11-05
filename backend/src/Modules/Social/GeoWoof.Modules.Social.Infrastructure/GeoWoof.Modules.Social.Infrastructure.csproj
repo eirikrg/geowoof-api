@@ -5,6 +5,7 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Design-time services for `dotnet ef migrations` (SocialDbContextDesignTimeFactory). -->
+    <PackageReference Include="SkiaSharp" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

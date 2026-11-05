@@ -70,8 +70,11 @@ public sealed class SocialHandlerTests
     private Task<Result<BuildingBlocks.Application.Paging.PagedResponse<PersonDto>>> PeopleAsync(Guid viewer, Guid user, PeopleList list) =>
         new GetPeopleQueryHandler(_follows, _identity, _graphs, Summaries).Handle(new GetPeopleQuery(viewer, user, list, null, null), Token);
 
+    private readonly FakePosts _posts = new();
+    private readonly FakePostActions _postActions = new();
+
     private Task<Result> BlockAsync(Guid from, Guid to) =>
-        new BlockUserCommandHandler(_blocks, _follows, _requests, _identity, _graphs, _unitOfWork, _time).Handle(new BlockUserCommand(from, to), Token);
+        new BlockUserCommandHandler(_blocks, _follows, _requests, _postActions, _identity, _graphs, _unitOfWork, _time).Handle(new BlockUserCommand(from, to), Token);
 
     private void AddFollow(Guid follower, Guid followee) =>
         _follows.Add(Follow.Start(Guid.CreateVersion7(), follower, followee, theyFollowBack: false, Now));
@@ -488,7 +491,7 @@ public sealed class SocialHandlerTests
     [Fact]
     public async Task A_report_is_kept_once_while_it_is_open()
     {
-        var handler = new CreateReportCommandHandler(_reports, _identity, _unitOfWork, _time);
+        var handler = new CreateReportCommandHandler(_reports, _posts, new FakeComments(), _identity, _graphs, _unitOfWork, _time);
 
         var first = await handler.Handle(new CreateReportCommand(Ana, "User", Bea, "Harassment", "  insists  "), Token);
         var second = await handler.Handle(new CreateReportCommand(Ana, "User", Bea, "Spam", null), Token);
@@ -502,7 +505,7 @@ public sealed class SocialHandlerTests
     [Fact]
     public async Task You_cannot_report_yourself_or_someone_who_does_not_exist_but_you_can_report_someone_you_blocked()
     {
-        var handler = new CreateReportCommandHandler(_reports, _identity, _unitOfWork, _time);
+        var handler = new CreateReportCommandHandler(_reports, _posts, new FakeComments(), _identity, _graphs, _unitOfWork, _time);
         await BlockAsync(Ana, Bea);
 
         (await handler.Handle(new CreateReportCommand(Ana, "User", Ana, "Spam", null), Token)).Error.ShouldBe(SocialErrors.CannotTargetSelf);
@@ -551,7 +554,7 @@ public sealed class SocialHandlerTests
         _reports.Add(Report.Create(Guid.CreateVersion7(), Ana, ReportTargetType.User, Carlos, ReportReason.Spam, null, Now));
         _reports.Add(Report.Create(Guid.CreateVersion7(), Carlos, ReportTargetType.User, Ana, ReportReason.Spam, null, Now));
 
-        await new DeleteSocialDataOnUserDeleted(_requests, _follows, _blocks, _reports).Handle(new UserDeleted(Ana, Now), Token);
+        await new DeleteSocialDataOnUserDeleted(_requests, _follows, _blocks, _reports, _posts).Handle(new UserDeleted(Ana, Now), Token);
 
         _follows.Items.Count.ShouldBe(2);
         _follows.Items.ShouldAllBe(follow => follow.FollowerId != Ana && follow.FolloweeId != Ana);
@@ -607,7 +610,7 @@ public sealed class SocialHandlerTests
     public void The_validators_accept_only_what_the_contract_says()
     {
         new CreateReportCommandValidator().Validate(new CreateReportCommand(Ana, "User", Bea, "Spam", null)).IsValid.ShouldBeTrue();
-        new CreateReportCommandValidator().Validate(new CreateReportCommand(Ana, "Post", Bea, "Spam", null)).IsValid.ShouldBeFalse();
+        new CreateReportCommandValidator().Validate(new CreateReportCommand(Ana, "Walk", Bea, "Spam", null)).IsValid.ShouldBeFalse();
         new CreateReportCommandValidator().Validate(new CreateReportCommand(Ana, "User", Bea, "Rude", null)).IsValid.ShouldBeFalse();
         new CreateReportCommandValidator().Validate(new CreateReportCommand(Ana, "User", Bea, "Spam", new string('x', Report.DetailsMaxLength + 1))).IsValid.ShouldBeFalse();
     }
