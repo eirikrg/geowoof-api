@@ -11,7 +11,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-geowoof}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geowoof_dev_only}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432" # Only this computer: nothing on the network needs the database directly.
     volumes:
       # PostgreSQL 18 images keep data under /var/lib/postgresql/<major>/docker.
       - postgres-data:/var/lib/postgresql
@@ -24,7 +24,7 @@ services:
   redis:
     image: redis:8.8
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -38,8 +38,8 @@ services:
     image: chrislusf/seaweedfs:4.52
     command: server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
     ports:
-      - "8333:8333" # S3 API
-      - "8888:8888" # Filer UI (browse stored objects)
+      - "8333:8333" # S3 API, which a phone needs for the images
+      - "127.0.0.1:8888:8888" # Filer UI (browse stored objects)
     volumes:
       - storage-data:/data
       - ./infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
@@ -47,8 +47,8 @@ services:
   mailpit:
     image: axllent/mailpit:v1.33
     ports:
-      - "8025:8025" # Web UI with every email sent by the API
-      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI with every email sent by the API, also for reading the codes on a phone
+      - "127.0.0.1:1025:1025" # SMTP
 
   api:
     build:
