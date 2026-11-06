@@ -101,17 +101,37 @@ internal sealed partial class FirebasePushSender : IPushSender
         var invalid = new List<string>();
         for (var index = 0; index < answer.Responses.Count; index++)
         {
-            if (answer.Responses[index].Exception?.MessagingErrorCode is MessagingErrorCode.Unregistered or MessagingErrorCode.InvalidArgument or MessagingErrorCode.SenderIdMismatch)
+            var failure = answer.Responses[index].Exception;
+            if (failure is null)
+            {
+                continue;
+            }
+
+            // Firebase answers each device apart, so nothing is thrown: this is the only trace of a failure.
+            // Without a messaging code it is about the project, not the device, and only the message says what to do.
+            LogDeviceRefused(
+                _logger,
+                failure.MessagingErrorCode?.ToString() ?? "None",
+                failure.ErrorCode.ToString(),
+                failure.MessagingErrorCode is null ? failure.Message : string.Empty);
+            if (failure.MessagingErrorCode is MessagingErrorCode.Unregistered or MessagingErrorCode.InvalidArgument or MessagingErrorCode.SenderIdMismatch)
             {
                 invalid.Add(tokens[index]);
             }
         }
 
+        LogSent(_logger, answer.SuccessCount, tokens.Count);
         return invalid;
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "The Firebase key could not be read ({Reason}): no push will be sent")]
     private static partial void LogKeyUnreadable(ILogger logger, string reason);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Firebase refused a push for a device ({MessagingCode}, {Code}) {Detail}")]
+    private static partial void LogDeviceRefused(ILogger logger, string messagingCode, string code, string detail);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Firebase accepted a push for {Accepted} of {Devices} devices")]
+    private static partial void LogSent(ILogger logger, int accepted, int devices);
 }
 
 internal sealed class NotificationStore(NotificationsDbContext dbContext) : INotificationStore
