@@ -6,6 +6,7 @@ using GeoWoof.BuildingBlocks.Application.Security;
 using GeoWoof.BuildingBlocks.Presentation.Errors;
 using GeoWoof.BuildingBlocks.Presentation.Security;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
@@ -28,6 +29,11 @@ internal static class ApiServiceCollectionExtensions
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
             options.SerializerOptions.Converters.Add(new UtcDateTimeOffsetJsonConverter());
         });
+
+        // Behind a reverse proxy every connection comes from the proxy, so the rate limits per IP need the
+        // client's address. By default only loopback is trusted: nobody else can choose their own address.
+        services.Configure<ForwardedHeadersOptions>(options =>
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
 
         services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemDetailsDefaults.Customize);
         services.AddExceptionHandler<GlobalExceptionHandler>();

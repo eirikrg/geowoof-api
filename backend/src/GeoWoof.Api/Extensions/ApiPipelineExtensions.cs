@@ -9,6 +9,7 @@ internal static class ApiPipelineExtensions
 {
     public static WebApplication UseGeoWoofPipeline(this WebApplication app)
     {
+        app.UseForwardedHeaders();
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseGeoWoofRequestLogging();
