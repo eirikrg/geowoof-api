@@ -1,0 +1,35 @@
+[Unit]
+Description=GeoWoof API
+After=network-online.target postgresql.service redis-server.service seaweedfs.service
+# Wants, not Requires: the nightly backup stops SeaweedFS for a moment, and that must not stop the API.
+Wants=network-online.target postgresql.service redis-server.service seaweedfs.service
+
+[Service]
+Type=exec
+User=geowoof
+Group=geowoof
+WorkingDirectory=/opt/geowoof/current
+ExecStart=/opt/geowoof/current/GeoWoof.Api
+EnvironmentFile=/etc/geowoof/geowoof.env
+Restart=always
+RestartSec=5
+TimeoutStartSec=300
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# The Raspberry Pi has about 900 MiB for everything: past this limit, the API is what restarts.
+MemoryHigh=350M
+MemoryMax=450M
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

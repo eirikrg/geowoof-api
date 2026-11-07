@@ -1,0 +1,32 @@
+# The only service that listens on the internet. Caddy gets and renews the certificates by itself,
+# forwards WebSockets without any extra setting and keeps the Host header, which the S3 signature covers.
+# There are no access logs on purpose: a SignalR connection can carry its token in the URL.
+(common) {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+}
+
+api.eirikrg.com {
+	import common
+
+	# Monitoring stays inside the Raspberry Pi: curl http://127.0.0.1:8080/health/ready
+	@internal path /health/*
+	respond @internal 404
+
+	reverse_proxy 127.0.0.1:8080
+}
+
+s3.eirikrg.com {
+	import common
+
+	# Uploads and downloads with signed links. Nothing else of the storage is public.
+	request_body {
+		max_size 20MB
+	}
+
+	reverse_proxy 127.0.0.1:8333
+}

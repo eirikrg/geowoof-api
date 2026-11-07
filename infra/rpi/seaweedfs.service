@@ -1,0 +1,29 @@
+[Unit]
+Description=SeaweedFS (S3-compatible storage of the images)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=seaweedfs
+Group=seaweedfs
+WorkingDirectory=/var/lib/seaweedfs
+# Everything listens inside the Raspberry Pi: only Caddy reaches the S3 port. The volume server moves from
+# its default 8080, which is the API's. Up to 24 volumes of 256 MB: about 6 GB, within the microSD.
+ExecStart=/usr/local/bin/weed server -dir=/var/lib/seaweedfs -ip=127.0.0.1 -ip.bind=127.0.0.1 -volume.port=8081 -volume.max=24 -master.volumeSizeLimitMB=256 -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+# Without GOMEMLIMIT on purpose: with 120 or 200 MiB, Go collected garbage without stopping and took most of a
+# core at rest (2026-11-07: 70 %, with 94 % of it in the collector). Without it: 0 %, and about 120 MiB.
+Restart=always
+RestartSec=5
+MemoryHigh=240M
+MemoryMax=300M
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/seaweedfs
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target

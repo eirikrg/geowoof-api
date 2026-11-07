@@ -1,0 +1,9 @@
+[Unit]
+Description=Backup of the GeoWoof database and images
+After=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/geowoof-backup
+Nice=10
+IOSchedulingClass=idle
