@@ -4,6 +4,7 @@ using GeoWoof.BuildingBlocks.Application.Paging;
 using GeoWoof.BuildingBlocks.Presentation.Results;
 using GeoWoof.BuildingBlocks.Presentation.Security;
 using GeoWoof.Modules.Pets.Application;
+using GeoWoof.Modules.Pets.Application.Health;
 using GeoWoof.Modules.Pets.Application.Pets;
 using GeoWoof.Modules.Pets.Application.Weights;
 using Microsoft.AspNetCore.Builder;
@@ -30,6 +31,8 @@ public sealed record PetRequest(
 }
 
 public sealed record WeightRequest(DateOnly MeasuredOn, decimal WeightKg);
+
+public sealed record CompleteHealthEventRequest(DateOnly DoneOn);
 
 /// <summary>Minimal API endpoints of the Pets module, mapped under <c>/api/v1</c>.</summary>
 public static class PetsEndpoints
@@ -62,8 +65,61 @@ public static class PetsEndpoints
             .Produces<WeightEntryDto>().ProducesValidationProblem().ProducesProblem(StatusCodes.Status409Conflict);
         weights.MapDelete("/{weightId:guid}", DeleteWeightAsync)
             .Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound);
+
+        var health = pets.MapGroup("/{id:guid}/health");
+        health.MapGet(string.Empty, GetHealthAsync)
+            .Produces<PagedResponse<HealthEventDto>>().ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound);
+        health.MapPut("/{eventId:guid}", PutHealthEventAsync)
+            .Produces<HealthEventDto>(StatusCodes.Status201Created)
+            .Produces<HealthEventDto>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+        health.MapPost("/{eventId:guid}/complete", CompleteHealthEventAsync)
+            .Produces<HealthCompletionDto>().ProducesValidationProblem().ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound);
+        health.MapDelete("/{eventId:guid}", DeleteHealthEventAsync)
+            .Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound);
         return api;
     }
+
+    private static async Task<IResult> GetHealthAsync(
+        Guid id,
+        ClaimsPrincipal user,
+        IQueryHandler<GetHealthQuery, PagedResponse<HealthEventDto>> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new GetHealthQuery(user.GetUserId(), id), cancellationToken)).ToHttpResult(TypedResults.Ok);
+
+    private static async Task<IResult> PutHealthEventAsync(
+        Guid id,
+        Guid eventId,
+        HealthEventInput request,
+        ClaimsPrincipal user,
+        ICommandHandler<PutHealthEventCommand, PutHealthEventResult> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new PutHealthEventCommand(user.GetUserId(), id, eventId, request), cancellationToken))
+            .ToHttpResult(result => result.Created
+                ? TypedResults.Created($"/api/v1/pets/{id}/health/{eventId}", result.Event)
+                : TypedResults.Ok(result.Event));
+
+    private static async Task<IResult> CompleteHealthEventAsync(
+        Guid id,
+        Guid eventId,
+        CompleteHealthEventRequest request,
+        ClaimsPrincipal user,
+        ICommandHandler<CompleteHealthEventCommand, HealthCompletionDto> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new CompleteHealthEventCommand(user.GetUserId(), id, eventId, request.DoneOn), cancellationToken))
+            .ToHttpResult(TypedResults.Ok);
+
+    private static async Task<IResult> DeleteHealthEventAsync(
+        Guid id,
+        Guid eventId,
+        ClaimsPrincipal user,
+        ICommandHandler<DeleteHealthEventCommand> handler,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new DeleteHealthEventCommand(user.GetUserId(), id, eventId), cancellationToken)).ToHttpResult();
 
     private static async Task<IResult> GetUserPetsAsync(
         Guid id,

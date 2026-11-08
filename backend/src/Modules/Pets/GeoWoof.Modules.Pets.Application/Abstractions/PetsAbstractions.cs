@@ -21,7 +21,7 @@ public interface IPetRepository
 
     void Add(Pet pet);
 
-    /// <summary>Also removes its weight entries.</summary>
+    /// <summary>Also removes its weight entries and its health events.</summary>
     void Remove(Pet pet);
 }
 
@@ -35,6 +35,21 @@ public interface IPetWeightRepository
     void Add(PetWeightEntry entry);
 
     void Remove(PetWeightEntry entry);
+}
+
+public interface IHealthEventRepository
+{
+    /// <summary>Whatever pet it is of: an identifier from the app can be taken by another one.</summary>
+    Task<HealthEvent?> GetByIdAsync(Guid eventId, CancellationToken cancellationToken);
+
+    /// <summary>All of them, by the day they are due.</summary>
+    Task<IReadOnlyList<HealthEvent>> GetByPetAsync(Guid petId, CancellationToken cancellationToken);
+
+    Task<int> CountByPetAsync(Guid petId, CancellationToken cancellationToken);
+
+    void Add(HealthEvent healthEvent);
+
+    void Remove(HealthEvent healthEvent);
 }
 
 /// <summary>Saves the Pets module's changes in one transaction (with its Outbox).</summary>
