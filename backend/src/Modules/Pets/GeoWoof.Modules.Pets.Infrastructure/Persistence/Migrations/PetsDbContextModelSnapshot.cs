@@ -99,6 +99,81 @@ namespace GeoWoof.Modules.Pets.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", "pets");
                 });
 
+            modelBuilder.Entity("GeoWoof.Modules.Pets.Domain.HealthEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly?>("DoneOn")
+                        .HasColumnType("date")
+                        .HasColumnName("done_on");
+
+                    b.Property<TimeOnly?>("DueAt")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<DateOnly>("DueOn")
+                        .HasColumnType("date")
+                        .HasColumnName("due_on");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pet_id");
+
+                    b.Property<string>("Reminder")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("reminder");
+
+                    b.Property<int?>("RepeatEvery")
+                        .HasColumnType("integer")
+                        .HasColumnName("repeat_every");
+
+                    b.Property<string>("RepeatUnit")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("repeat_unit");
+
+                    b.Property<DateOnly?>("RepeatUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("repeat_until");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_health_events");
+
+                    b.HasIndex("PetId", "DueOn")
+                        .HasDatabaseName("ix_health_events_pet_id_due_on");
+
+                    b.ToTable("health_events", "pets");
+                });
+
             modelBuilder.Entity("GeoWoof.Modules.Pets.Domain.Pet", b =>
                 {
                     b.Property<Guid>("Id")
@@ -213,6 +288,16 @@ namespace GeoWoof.Modules.Pets.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_pet_weight_entries_pet_id_measured_on");
 
                     b.ToTable("pet_weight_entries", "pets");
+                });
+
+            modelBuilder.Entity("GeoWoof.Modules.Pets.Domain.HealthEvent", b =>
+                {
+                    b.HasOne("GeoWoof.Modules.Pets.Domain.Pet", null)
+                        .WithMany()
+                        .HasForeignKey("PetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_health_events_pets_pet_id");
                 });
 
             modelBuilder.Entity("GeoWoof.Modules.Pets.Domain.PetWeightEntry", b =>

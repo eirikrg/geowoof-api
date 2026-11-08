@@ -22,5 +22,14 @@ public static class PetsErrors
     public static readonly Error WeightDateTaken =
         Error.Conflict("pets.weight_date_taken", "There is already a weight entry on that date.");
 
+    public static readonly Error HealthEventNotFound =
+        Error.NotFound("pets.health_event_not_found", "The health event does not exist.");
+
+    public static readonly Error HealthEventIdTaken =
+        Error.Conflict("pets.health_event_id_taken", "That identifier belongs to a health event of another pet.");
+
+    public static readonly Error HealthLimitReached =
+        Error.Unprocessable("pets.health_limit_reached", $"A pet can have at most {HealthEvent.MaxPerPet} health events.");
+
     public static readonly Error InvalidCursor = Error.Validation("request.invalid", "The cursor is not valid.");
 }

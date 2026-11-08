@@ -18,6 +18,7 @@ public static class PetsModule
         services.AddScoped<IPetsUnitOfWork>(serviceProvider => serviceProvider.GetRequiredService<PetsDbContext>());
         services.AddScoped<IPetRepository, PetRepository>();
         services.AddScoped<IPetWeightRepository, PetWeightRepository>();
+        services.AddScoped<IHealthEventRepository, HealthEventRepository>();
         services.AddScoped<IDevelopmentDataSeeder, PetsDevelopmentSeeder>();
         services.AddIntegrationEvents(typeof(PetCreated).Assembly);
         services.AddIntegrationEventConsumers<PetsDbContext>(typeof(PetsApplication).Assembly);

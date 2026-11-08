@@ -19,12 +19,15 @@ public sealed class PetsDbContext(DbContextOptions<PetsDbContext> options) : Mod
 
     public DbSet<PetWeightEntry> WeightEntries => Set<PetWeightEntry>();
 
+    public DbSet<HealthEvent> HealthEvents => Set<HealthEvent>();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("pg_trgm");
         modelBuilder.HasPostgresExtension("unaccent");
         modelBuilder.ApplyConfiguration(new PetConfiguration());
         modelBuilder.ApplyConfiguration(new PetWeightEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new HealthEventConfiguration());
     }
 }
 
@@ -60,6 +63,26 @@ internal sealed class PetWeightEntryConfiguration : IEntityTypeConfiguration<Pet
         // One measurement per day; it also serves the history, most recent first.
         builder.HasIndex(entry => new { entry.PetId, entry.MeasuredOn }).IsUnique();
         builder.HasOne<Pet>().WithMany().HasForeignKey(entry => entry.PetId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class HealthEventConfiguration : IEntityTypeConfiguration<HealthEvent>
+{
+    public void Configure(EntityTypeBuilder<HealthEvent> builder)
+    {
+        builder.ToTable("health_events");
+        builder.HasKey(healthEvent => healthEvent.Id);
+        builder.Property(healthEvent => healthEvent.Id).ValueGeneratedNever();
+        builder.Property(healthEvent => healthEvent.Type).HasConversion<string>().HasMaxLength(16);
+        builder.Property(healthEvent => healthEvent.Title).HasMaxLength(HealthEvent.TitleMaxLength).IsRequired();
+        builder.Property(healthEvent => healthEvent.RepeatUnit).HasConversion<string>().HasMaxLength(16);
+        builder.Property(healthEvent => healthEvent.Reminder).HasConversion<string>().HasMaxLength(16);
+        builder.Property(healthEvent => healthEvent.Notes).HasMaxLength(HealthEvent.NotesMaxLength);
+        builder.Ignore(healthEvent => healthEvent.Repeat);
+
+        // The health of a pet is read whole, by the day it is due.
+        builder.HasIndex(healthEvent => new { healthEvent.PetId, healthEvent.DueOn });
+        builder.HasOne<Pet>().WithMany().HasForeignKey(healthEvent => healthEvent.PetId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -141,4 +164,23 @@ internal sealed class PetWeightRepository(PetsDbContext dbContext) : IPetWeightR
     public void Add(PetWeightEntry entry) => dbContext.WeightEntries.Add(entry);
 
     public void Remove(PetWeightEntry entry) => dbContext.WeightEntries.Remove(entry);
+}
+
+internal sealed class HealthEventRepository(PetsDbContext dbContext) : IHealthEventRepository
+{
+    public Task<HealthEvent?> GetByIdAsync(Guid eventId, CancellationToken cancellationToken) =>
+        dbContext.HealthEvents.FirstOrDefaultAsync(healthEvent => healthEvent.Id == eventId, cancellationToken);
+
+    public async Task<IReadOnlyList<HealthEvent>> GetByPetAsync(Guid petId, CancellationToken cancellationToken) =>
+        await dbContext.HealthEvents.AsNoTracking()
+            .Where(healthEvent => healthEvent.PetId == petId)
+            .OrderBy(healthEvent => healthEvent.DueOn).ThenBy(healthEvent => healthEvent.DueAt).ThenBy(healthEvent => healthEvent.Id)
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountByPetAsync(Guid petId, CancellationToken cancellationToken) =>
+        dbContext.HealthEvents.CountAsync(healthEvent => healthEvent.PetId == petId, cancellationToken);
+
+    public void Add(HealthEvent healthEvent) => dbContext.HealthEvents.Add(healthEvent);
+
+    public void Remove(HealthEvent healthEvent) => dbContext.HealthEvents.Remove(healthEvent);
 }
