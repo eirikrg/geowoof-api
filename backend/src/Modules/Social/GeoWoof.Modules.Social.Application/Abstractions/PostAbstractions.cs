@@ -99,12 +99,27 @@ public interface IPostActionRepository
     void Remove(SavedPost saved);
 }
 
+/// <summary>How many replies of a comment the viewer can see, and the first of them, the oldest first.</summary>
+public sealed record CommentThread(int ReplyCount, IReadOnlyList<Comment> FirstReplies);
+
 public interface ICommentRepository
 {
     Task<Comment?> GetAsync(Guid commentId, CancellationToken cancellationToken);
 
-    /// <summary>The oldest first, without those of the people hidden from the viewer.</summary>
+    /// <summary>
+    /// The comments of the post itself, the oldest first, without those of the people hidden from the viewer, nor the
+    /// deleted ones without a reply that the viewer can see.
+    /// </summary>
     Task<IReadOnlyList<Comment>> GetPageAsync(Guid postId, IReadOnlyCollection<Guid> hiddenIds, SocialPosition? after, int take, CancellationToken cancellationToken);
+
+    /// <summary>The replies of a comment, the oldest first, without those of the people hidden from the viewer.</summary>
+    Task<IReadOnlyList<Comment>> GetRepliesPageAsync(Guid parentId, IReadOnlyCollection<Guid> hiddenIds, SocialPosition? after, int take, CancellationToken cancellationToken);
+
+    /// <summary>The threads of those comments that have replies that the viewer can see, with the <paramref name="first"/> first ones.</summary>
+    Task<IReadOnlyDictionary<Guid, CommentThread>> GetThreadsAsync(IReadOnlyCollection<Guid> parentIds, IReadOnlyCollection<Guid> hiddenIds, int first, CancellationToken cancellationToken);
+
+    /// <summary>Whether anyone has replied to it, apart from the reply <paramref name="except"/>.</summary>
+    Task<bool> HasRepliesAsync(Guid commentId, Guid? except, CancellationToken cancellationToken);
 
     void Add(Comment comment);
 

@@ -12,7 +12,8 @@ namespace GeoWoof.Modules.Social.Presentation;
 
 public sealed record PostBody(string? Text, string? Visibility, IReadOnlyList<Guid>? MediaAssetIds, IReadOnlyList<Guid>? PetIds);
 
-public sealed record CommentBody(string? Text);
+/// <summary>With <paramref name="ParentId"/>, a reply to that comment.</summary>
+public sealed record CommentBody(string? Text, Guid? ParentId);
 
 /// <summary>Posts, what people do with them, and the lists that show them.</summary>
 public static class PostEndpoints
@@ -40,6 +41,8 @@ public static class PostEndpoints
         posts.MapDelete("/likes", UnlikeAsync).Produces<PostLikeDto>().ProducesProblem(StatusCodes.Status404NotFound);
 
         posts.MapGet("/comments", GetCommentsAsync)
+            .Produces<PagedResponse<CommentDto>>().ProducesProblem(StatusCodes.Status400BadRequest).ProducesProblem(StatusCodes.Status404NotFound);
+        posts.MapGet("/comments/{commentId:guid}/replies", GetRepliesAsync)
             .Produces<PagedResponse<CommentDto>>().ProducesProblem(StatusCodes.Status400BadRequest).ProducesProblem(StatusCodes.Status404NotFound);
         posts.MapPost("/comments", AddCommentAsync)
             .RequireAuthorization(AuthorizationPolicies.VerifiedEmail)
@@ -121,13 +124,23 @@ public static class PostEndpoints
         CancellationToken cancellationToken) =>
         (await handler.Handle(new GetCommentsQuery(id, user.GetUserId(), limit, cursor), cancellationToken)).ToHttpResult(TypedResults.Ok);
 
+    private static async Task<IResult> GetRepliesAsync(
+        Guid id,
+        Guid commentId,
+        ClaimsPrincipal user,
+        IQueryHandler<GetRepliesQuery, PagedResponse<CommentDto>> handler,
+        int? limit,
+        string? cursor,
+        CancellationToken cancellationToken) =>
+        (await handler.Handle(new GetRepliesQuery(id, commentId, user.GetUserId(), limit, cursor), cancellationToken)).ToHttpResult(TypedResults.Ok);
+
     private static async Task<IResult> AddCommentAsync(
         Guid id,
         CommentBody body,
         ClaimsPrincipal user,
         ICommandHandler<AddCommentCommand, CommentDto> handler,
         CancellationToken cancellationToken) =>
-        (await handler.Handle(new AddCommentCommand(id, user.GetUserId(), body.Text), cancellationToken))
+        (await handler.Handle(new AddCommentCommand(id, user.GetUserId(), body.Text, body.ParentId), cancellationToken))
             .ToHttpResult(comment => TypedResults.Created($"/api/v1/posts/{id}/comments/{comment.Id}", comment));
 
     private static async Task<IResult> DeleteCommentAsync(

@@ -44,7 +44,9 @@ public sealed class TestInfrastructure : IAsyncLifetime
         PostgresConnectionString = Environment.GetEnvironmentVariable("GEOWOOF_TEST_POSTGRES") ?? string.Empty;
         if (PostgresConnectionString.Length == 0)
         {
-            _postgres = new PostgreSqlBuilder(PostgresImage).Build();
+            // Each test has its own API, with an Outbox per module, and the classes run at the same time: the 100
+            // connections of Postgres by default fall short.
+            _postgres = new PostgreSqlBuilder(PostgresImage).WithCommand("-c", "max_connections=300").Build();
             startups.Add(_postgres.StartAsync());
         }
 

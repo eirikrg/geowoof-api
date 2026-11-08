@@ -33,13 +33,21 @@ public sealed record PostDto(
 
 public sealed record TimelineItemDto(Guid Id, PostDto Post, UserSummaryDto? RepostedBy, DateTimeOffset? RepostedAt);
 
+/// <summary>
+/// A comment of the post, with how many replies it has and the first of them, or a reply, with <paramref name="ParentId"/>.
+/// One that <paramref name="IsDeleted"/> stays only because of its replies, without its text.
+/// </summary>
 public sealed record CommentDto(
     Guid Id,
     Guid PostId,
+    Guid? ParentId,
     UserSummaryDto Author,
     string Text,
     IReadOnlyList<MentionDto> Mentions,
     bool CanDelete,
+    bool IsDeleted,
+    int ReplyCount,
+    IReadOnlyList<CommentDto> Replies,
     DateTimeOffset CreatedAt);
 
 public sealed record PostLikeDto(int LikeCount, bool LikedByMe);

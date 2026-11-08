@@ -107,6 +107,56 @@ public sealed class PostTests
     }
 
     [Fact]
+    public void A_reply_goes_to_the_thread_of_its_comment_also_when_it_answers_a_reply()
+    {
+        var post = APost();
+        var comment = Comment.Add(Guid.CreateVersion7(), post, Bea, "Hola", [], Now);
+
+        var reply = Comment.Reply(Guid.CreateVersion7(), post, comment, Ana, "@bea hola", [new Mention(Bea, "bea")], Now);
+        var replyToReply = Comment.Reply(Guid.CreateVersion7(), post, reply, Bea, "@ana qué tal", [], Now);
+
+        comment.ParentId.ShouldBeNull();
+        reply.ParentId.ShouldBe(comment.Id);
+        replyToReply.ParentId.ShouldBe(comment.Id);
+        reply.DomainEvents.OfType<CommentAddedDomainEvent>().ShouldHaveSingleItem().PostAuthorId.ShouldBe(Ana);
+        reply.DomainEvents.OfType<UserMentionedDomainEvent>().ShouldHaveSingleItem().MentionedUserId.ShouldBe(Bea);
+    }
+
+    [Fact]
+    public void A_reply_cannot_answer_a_comment_of_another_post()
+    {
+        var comment = Comment.Add(Guid.CreateVersion7(), APost(), Bea, "Hola", [], Now);
+
+        Should.Throw<ArgumentException>(() => Comment.Reply(Guid.CreateVersion7(), APost(), comment, Ana, "Hola", [], Now));
+    }
+
+    [Fact]
+    public void A_deleted_comment_keeps_nothing_of_what_it_said_and_nobody_can_delete_it_again()
+    {
+        var post = APost();
+        var comment = Comment.Add(Guid.CreateVersion7(), post, Bea, "Hola @ana", [new Mention(Ana, "ana")], Now);
+
+        comment.MarkDeleted(Now.AddMinutes(1));
+
+        comment.IsDeleted.ShouldBeTrue();
+        comment.DeletedAt.ShouldBe(Now.AddMinutes(1));
+        comment.Text.ShouldBeEmpty();
+        comment.Mentions.ShouldBeEmpty();
+        comment.CanBeDeletedBy(Bea, post).ShouldBeFalse();
+        comment.CanBeDeletedBy(Ana, post).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Only_a_comment_of_the_post_stays_as_deleted()
+    {
+        var post = APost();
+        var comment = Comment.Add(Guid.CreateVersion7(), post, Bea, "Hola", [], Now);
+        var reply = Comment.Reply(Guid.CreateVersion7(), post, comment, Ana, "Hola", [], Now);
+
+        Should.Throw<InvalidOperationException>(() => reply.MarkDeleted(Now));
+    }
+
+    [Fact]
     public void A_like_and_a_repost_say_whose_post_it_is()
     {
         var post = APost();
