@@ -229,10 +229,11 @@ public sealed class Comment : AggregateRoot
     {
     }
 
-    private Comment(Guid id, Guid postId, Guid authorId, string text, DateTimeOffset now)
+    private Comment(Guid id, Guid postId, Guid? parentId, Guid authorId, string text, DateTimeOffset now)
         : base(id)
     {
         PostId = postId;
+        ParentId = parentId;
         AuthorId = authorId;
         Text = text.Trim();
         CreatedAt = now;
@@ -240,17 +241,42 @@ public sealed class Comment : AggregateRoot
 
     public Guid PostId { get; private set; }
 
+    /// <summary>
+    /// The comment of the post that this one answers, or null if it is one of those. There is only one level: a
+    /// reply to a reply goes to the same thread.
+    /// </summary>
+    public Guid? ParentId { get; private set; }
+
     public Guid AuthorId { get; private set; }
 
     public string Text { get; private set; } = null!;
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>When it was deleted, if it stays because of its replies: without its text or its mentions.</summary>
+    public DateTimeOffset? DeletedAt { get; private set; }
+
+    public bool IsDeleted => DeletedAt is not null;
+
     public IReadOnlyList<CommentMention> Mentions => _mentions;
 
-    public static Comment Add(Guid id, Post post, Guid authorId, string text, IReadOnlyCollection<Mention> found, DateTimeOffset now)
+    public static Comment Add(Guid id, Post post, Guid authorId, string text, IReadOnlyCollection<Mention> found, DateTimeOffset now) =>
+        Create(id, post, parentId: null, authorId, text, found, now);
+
+    /// <summary>A reply to <paramref name="parent"/>, which goes to its thread if it is a reply itself.</summary>
+    public static Comment Reply(Guid id, Post post, Comment parent, Guid authorId, string text, IReadOnlyCollection<Mention> found, DateTimeOffset now)
     {
-        var comment = new Comment(id, post.Id, authorId, text, now);
+        if (parent.PostId != post.Id)
+        {
+            throw new ArgumentException("The comment is of another post.", nameof(parent));
+        }
+
+        return Create(id, post, parent.ParentId ?? parent.Id, authorId, text, found, now);
+    }
+
+    private static Comment Create(Guid id, Post post, Guid? parentId, Guid authorId, string text, IReadOnlyCollection<Mention> found, DateTimeOffset now)
+    {
+        var comment = new Comment(id, post.Id, parentId, authorId, text, now);
         comment._mentions.AddRange(found.Select(mention => new CommentMention(id, mention.UserId, mention.Username)));
         comment.Raise(new CommentAddedDomainEvent(id, post.Id, post.AuthorId, authorId));
         foreach (var mention in found.Where(mention => mention.UserId != authorId))
@@ -261,7 +287,23 @@ public sealed class Comment : AggregateRoot
         return comment;
     }
 
-    public bool CanBeDeletedBy(Guid userId, Post post) => userId == AuthorId || userId == post.AuthorId;
+    public bool CanBeDeletedBy(Guid userId, Post post) => !IsDeleted && (userId == AuthorId || userId == post.AuthorId);
+
+    /// <summary>
+    /// What stays of a comment of the post that is deleted while it has replies, so that they keep their place.
+    /// Nothing of what it said remains.
+    /// </summary>
+    public void MarkDeleted(DateTimeOffset now)
+    {
+        if (ParentId is not null)
+        {
+            throw new InvalidOperationException("A reply has no thread to keep.");
+        }
+
+        DeletedAt ??= now;
+        Text = string.Empty;
+        _mentions.Clear();
+    }
 }
 
 public sealed class CommentMention

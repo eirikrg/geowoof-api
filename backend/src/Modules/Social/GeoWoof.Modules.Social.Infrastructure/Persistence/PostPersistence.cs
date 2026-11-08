@@ -83,7 +83,12 @@ internal sealed class CommentConfiguration : IEntityTypeConfiguration<Comment>
         builder.Property(comment => comment.Id).ValueGeneratedNever();
         builder.Property(comment => comment.Text).HasMaxLength(Comment.TextMaxLength).IsRequired();
         builder.HasOne<Post>().WithMany().HasForeignKey(comment => comment.PostId).OnDelete(DeleteBehavior.Cascade);
+        // The replies of a comment go with it, which only happens with all of the post or of an account: deleting
+        // one with replies leaves it as deleted.
+        builder.HasOne<Comment>().WithMany().HasForeignKey(comment => comment.ParentId).OnDelete(DeleteBehavior.Cascade);
+        builder.Ignore(comment => comment.IsDeleted);
         builder.HasIndex(comment => new { comment.PostId, comment.CreatedAt, comment.Id });
+        builder.HasIndex(comment => new { comment.ParentId, comment.CreatedAt, comment.Id });
         builder.HasIndex(comment => comment.AuthorId);
         builder.HasMany(comment => comment.Mentions).WithOne().HasForeignKey(mention => mention.CommentId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(comment => comment.Mentions).UsePropertyAccessMode(PropertyAccessMode.Field);
@@ -157,8 +162,13 @@ internal sealed class PostRepository(SocialDbContext dbContext) : IPostRepositor
             .GroupBy(like => like.PostId)
             .Select(group => new { group.Key, Count = group.Count() })
             .ToDictionaryAsync(group => group.Key, group => group.Count, cancellationToken);
+        // Replies count too, unless their thread is hidden, and a deleted comment does not.
         var comments = await dbContext.Comments.AsNoTracking()
-            .Where(comment => postIds.Contains(comment.PostId) && !hiddenIds.Contains(comment.AuthorId))
+            .Where(comment => postIds.Contains(comment.PostId)
+                && comment.DeletedAt == null
+                && !hiddenIds.Contains(comment.AuthorId)
+                && (comment.ParentId == null
+                    || dbContext.Comments.Any(parent => parent.Id == comment.ParentId && !hiddenIds.Contains(parent.AuthorId))))
             .GroupBy(comment => comment.PostId)
             .Select(group => new { group.Key, Count = group.Count() })
             .ToDictionaryAsync(group => group.Key, group => group.Count, cancellationToken);
@@ -294,7 +304,18 @@ internal sealed class PostRepository(SocialDbContext dbContext) : IPostRepositor
         await dbContext.SavedPosts.Where(saved => saved.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await dbContext.Reposts.Where(repost => repost.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await dbContext.PostLikes.Where(like => like.UserId == userId).ExecuteDeleteAsync(cancellationToken);
+
+        // Its replies may be all that kept a deleted comment of someone else, which then goes too. The replies to its
+        // comments go with them.
+        var threads = await dbContext.Comments
+            .Where(comment => comment.AuthorId == userId && comment.ParentId != null)
+            .Select(comment => comment.ParentId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
         await dbContext.Comments.Where(comment => comment.AuthorId == userId).ExecuteDeleteAsync(cancellationToken);
+        await dbContext.Comments
+            .Where(comment => threads.Contains(comment.Id) && comment.DeletedAt != null && !dbContext.Comments.Any(reply => reply.ParentId == comment.Id))
+            .ExecuteDeleteAsync(cancellationToken);
 
         // The rest of what depends on them is removed by the foreign keys. The Media module erases the images of the account.
         await dbContext.Posts.Where(post => post.AuthorId == userId).ExecuteDeleteAsync(cancellationToken);
@@ -370,7 +391,56 @@ internal sealed class CommentRepository(SocialDbContext dbContext) : ICommentRep
 
     public async Task<IReadOnlyList<Comment>> GetPageAsync(Guid postId, IReadOnlyCollection<Guid> hiddenIds, SocialPosition? after, int take, CancellationToken cancellationToken)
     {
-        var rows = dbContext.Comments.AsNoTracking().Where(comment => comment.PostId == postId && !hiddenIds.Contains(comment.AuthorId));
+        var rows = dbContext.Comments.AsNoTracking().Where(comment =>
+            comment.PostId == postId
+            && comment.ParentId == null
+            && !hiddenIds.Contains(comment.AuthorId)
+            && (comment.DeletedAt == null || dbContext.Comments.Any(reply => reply.ParentId == comment.Id && !hiddenIds.Contains(reply.AuthorId))));
+        return await PageAsync(rows, after, take, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Comment>> GetRepliesPageAsync(Guid parentId, IReadOnlyCollection<Guid> hiddenIds, SocialPosition? after, int take, CancellationToken cancellationToken)
+    {
+        var rows = dbContext.Comments.AsNoTracking().Where(comment => comment.ParentId == parentId && !hiddenIds.Contains(comment.AuthorId));
+        return await PageAsync(rows, after, take, cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, CommentThread>> GetThreadsAsync(IReadOnlyCollection<Guid> parentIds, IReadOnlyCollection<Guid> hiddenIds, int first, CancellationToken cancellationToken)
+    {
+        var replies = dbContext.Comments.AsNoTracking()
+            .Where(reply => reply.ParentId != null && parentIds.Contains(reply.ParentId.Value) && !hiddenIds.Contains(reply.AuthorId));
+        var counts = await replies
+            .GroupBy(reply => reply.ParentId!.Value)
+            .Select(group => new { group.Key, Count = group.Count() })
+            .ToDictionaryAsync(group => group.Key, group => group.Count, cancellationToken);
+        if (counts.Count == 0)
+        {
+            return new Dictionary<Guid, CommentThread>();
+        }
+
+        // The first ones of each thread: those with fewer than that many before them.
+        var firsts = await replies
+            .Where(reply => dbContext.Comments.Count(other =>
+                other.ParentId == reply.ParentId
+                && !hiddenIds.Contains(other.AuthorId)
+                && (other.CreatedAt < reply.CreatedAt || (other.CreatedAt == reply.CreatedAt && other.Id.CompareTo(reply.Id) < 0))) < first)
+            .OrderBy(reply => reply.CreatedAt).ThenBy(reply => reply.Id)
+            .Include(reply => reply.Mentions)
+            .ToListAsync(cancellationToken);
+        return counts.ToDictionary(
+            count => count.Key,
+            count => new CommentThread(count.Value, firsts.Where(reply => reply.ParentId == count.Key).ToList()));
+    }
+
+    public Task<bool> HasRepliesAsync(Guid commentId, Guid? except, CancellationToken cancellationToken) =>
+        dbContext.Comments.AnyAsync(reply => reply.ParentId == commentId && reply.Id != except, cancellationToken);
+
+    public void Add(Comment comment) => dbContext.Comments.Add(comment);
+
+    public void Remove(Comment comment) => dbContext.Comments.Remove(comment);
+
+    private static async Task<IReadOnlyList<Comment>> PageAsync(IQueryable<Comment> rows, SocialPosition? after, int take, CancellationToken cancellationToken)
+    {
         if (after is not null)
         {
             rows = rows.Where(comment => comment.CreatedAt > after.At || (comment.CreatedAt == after.At && comment.Id.CompareTo(after.Id) > 0));
@@ -382,8 +452,4 @@ internal sealed class CommentRepository(SocialDbContext dbContext) : ICommentRep
             .Include(comment => comment.Mentions)
             .ToListAsync(cancellationToken);
     }
-
-    public void Add(Comment comment) => dbContext.Comments.Add(comment);
-
-    public void Remove(Comment comment) => dbContext.Comments.Remove(comment);
 }

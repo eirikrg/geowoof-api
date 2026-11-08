@@ -7,10 +7,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GeoWoof.IntegrationTests.Social;
 
-/// <summary>The friends of phase 4 become follows: nobody loses anyone when the model changes.</summary>
+/// <summary>Nobody loses anything when the model changes: friends that became follows, and comments that got threads.</summary>
 public sealed class SocialMigrationTests(TestInfrastructure infrastructure)
 {
     private const string BeforeFollows = "20261105112934_InitialSocial";
+    private const string BeforeReplies = "20261105162329_AddPosts";
 
     private static readonly Guid Ana = Guid.CreateVersion7();
     private static readonly Guid Bea = Guid.CreateVersion7();
@@ -52,5 +53,34 @@ public sealed class SocialMigrationTests(TestInfrastructure infrastructure)
         follows.Select(follow => (follow.FollowerId, follow.FolloweeId)).ShouldBe([(Ana, Bea), (Bea, Ana), (Carlos, Ana)], ignoreOrder: true);
         follows.Where(follow => follow.FollowerId != Carlos).ShouldAllBe(follow => follow.CreatedAt == new DateTimeOffset(2026, 11, 1, 10, 0, 0, TimeSpan.Zero));
         (await social.FollowRequests.AsNoTracking().CountAsync(Token)).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task The_comments_that_there_were_stay_as_comments_of_the_post()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var startsTheApp = api.CreateClient();
+        using var scope = api.Services.CreateScope();
+        var social = scope.ServiceProvider.GetRequiredService<SocialDbContext>();
+        var migrator = social.GetService<IMigrator>();
+        await migrator.MigrateAsync(BeforeReplies, Token);
+        var postId = Guid.CreateVersion7();
+        var commentId = Guid.CreateVersion7();
+
+        var oldData = $"""
+            INSERT INTO social.posts (id, author_id, text, visibility, author_is_private, created_at)
+            VALUES ('{postId}', '{Ana}', 'Un paseo', 'Everyone', false, '2026-11-01T10:00:00Z');
+            INSERT INTO social.comments (id, post_id, author_id, text, created_at)
+            VALUES ('{commentId}', '{postId}', '{Bea}', 'Qué bonito', '2026-11-01T11:00:00Z');
+            """;
+        await social.Database.ExecuteSqlRawAsync(oldData, Token);
+
+        await migrator.MigrateAsync(cancellationToken: Token);
+
+        var comment = await social.Comments.AsNoTracking().SingleAsync(Token);
+        comment.Id.ShouldBe(commentId);
+        comment.Text.ShouldBe("Qué bonito");
+        comment.ParentId.ShouldBeNull();
+        comment.IsDeleted.ShouldBeFalse();
     }
 }

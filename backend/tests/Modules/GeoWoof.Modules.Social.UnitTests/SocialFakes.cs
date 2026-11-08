@@ -314,6 +314,14 @@ internal sealed class FakeComments : ICommentRepository
     public Task<IReadOnlyList<Comment>> GetPageAsync(Guid postId, IReadOnlyCollection<Guid> hiddenIds, SocialPosition? after, int take, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<Comment>>([]);
 
+    public Task<IReadOnlyList<Comment>> GetRepliesPageAsync(Guid parentId, IReadOnlyCollection<Guid> hiddenIds, SocialPosition? after, int take, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Comment>>([]);
+
+    public Task<IReadOnlyDictionary<Guid, CommentThread>> GetThreadsAsync(IReadOnlyCollection<Guid> parentIds, IReadOnlyCollection<Guid> hiddenIds, int first, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, CommentThread>>(new Dictionary<Guid, CommentThread>());
+
+    public Task<bool> HasRepliesAsync(Guid commentId, Guid? except, CancellationToken cancellationToken) => Task.FromResult(false);
+
     public void Add(Comment comment)
     {
     }

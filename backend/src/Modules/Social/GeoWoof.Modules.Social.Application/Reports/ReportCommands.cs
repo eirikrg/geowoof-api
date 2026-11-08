@@ -77,7 +77,9 @@ internal sealed class CreateReportCommandHandler(
 
             case ReportTargetType.Comment:
                 var comment = await comments.GetAsync(command.TargetId, cancellationToken);
+                // What is left of a deleted comment says nothing to report.
                 if (comment is null
+                    || comment.IsDeleted
                     || await FindVisiblePostAsync(command.ReporterId, comment.PostId, cancellationToken) is null
                     || (await graphs.GetAsync(command.ReporterId, cancellationToken)).IsBlockedEitherWay(comment.AuthorId))
                 {

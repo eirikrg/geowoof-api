@@ -111,6 +111,14 @@ namespace GeoWoof.Modules.Social.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_id");
+
                     b.Property<Guid>("PostId")
                         .HasColumnType("uuid")
                         .HasColumnName("post_id");
@@ -126,6 +134,9 @@ namespace GeoWoof.Modules.Social.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AuthorId")
                         .HasDatabaseName("ix_comments_author_id");
+
+                    b.HasIndex("ParentId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_comments_parent_id_created_at_id");
 
                     b.HasIndex("PostId", "CreatedAt", "Id")
                         .HasDatabaseName("ix_comments_post_id_created_at_id");
@@ -533,6 +544,12 @@ namespace GeoWoof.Modules.Social.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("GeoWoof.Modules.Social.Domain.Comment", b =>
                 {
+                    b.HasOne("GeoWoof.Modules.Social.Domain.Comment", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_comments_comments_parent_id");
+
                     b.HasOne("GeoWoof.Modules.Social.Domain.Post", null)
                         .WithMany()
                         .HasForeignKey("PostId")
