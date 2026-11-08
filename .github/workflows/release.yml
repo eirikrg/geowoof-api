@@ -1,10 +1,15 @@
 name: Release
 
-# Each pull request merged into main gets the next version (one more in the last number) and a GitHub
-# release that names the latest version of the Android app at that moment.
+# Publishes a version of what main has now, when someone presses "Run workflow" here: merging does not make one,
+# so several pull requests can go into the same version. The release lists them and names the latest version of
+# the Android app at that moment.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Only to choose the number by hand, such as 1.0.0. Empty: the next one."
+        required: false
+        default: ""
 
 concurrency:
   group: release
@@ -16,7 +21,8 @@ permissions:
 
 jobs:
   version:
-    name: Version the merged pull request
+    name: Publish a version of main
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,4 +33,5 @@ jobs:
       - name: Tag and publish the release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python3 .github/scripts/release.py --other-repo eirikrg/geowoof-and --other-name App
+          VERSION: ${{ inputs.version }}
+        run: python3 .github/scripts/release.py --other-repo eirikrg/geowoof-and --other-name App --version "$VERSION"
