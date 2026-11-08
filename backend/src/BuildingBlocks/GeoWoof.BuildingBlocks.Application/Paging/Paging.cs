@@ -3,7 +3,7 @@ using System.Text;
 
 namespace GeoWoof.BuildingBlocks.Application.Paging;
 
-/// <summary>A page of a list (docs/api.md, section 3). <see cref="NextCursor"/> is <c>null</c> on the last page.</summary>
+/// <summary>A page of a list. <see cref="NextCursor"/> is <c>null</c> on the last page.</summary>
 public sealed record PagedResponse<T>(IReadOnlyList<T> Items, string? NextCursor);
 
 public static class PageLimit

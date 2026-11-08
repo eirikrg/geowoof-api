@@ -24,7 +24,7 @@ internal static class ViewerRelations
     };
 }
 
-/// <summary>For whoever cannot see it, the walk does not exist (docs/api.md).</summary>
+/// <summary>For whoever cannot see it, the walk does not exist.</summary>
 public sealed record GetWalkQuery(Guid ViewerId, Guid WalkId) : IQuery<WalkDto>;
 
 internal sealed class GetWalkQueryHandler(IWalkRepository walks, IIdentityApi identity, IRelationshipsApi relationships, IMediaApi media) : IQueryHandler<GetWalkQuery, WalkDto>

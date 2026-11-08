@@ -118,7 +118,7 @@ public static class ChatEndpoints
         (await handler.Handle(new MarkConversationReadCommand(user.GetUserId(), id, request.LastReadMessageId), cancellationToken)).ToHttpResult();
 }
 
-/// <summary>Messages in real time (docs/realtime.md). It only tells: sending and reading go by REST.</summary>
+/// <summary>Messages in real time. It only tells: sending and reading go by REST.</summary>
 [Authorize]
 public sealed class ChatHub(ICommandHandler<SetTypingCommand> setTyping, ChatConnections connections, TimeProvider timeProvider) : Hub
 {

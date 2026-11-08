@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GeoWoof.IntegrationTests.Identity;
 
-/// <summary>The phase 1 contract (docs/api.md) end to end: HTTP, handlers, PostgreSQL and the Outbox.</summary>
+/// <summary>The phase 1 contract end to end: HTTP, handlers, PostgreSQL and the Outbox.</summary>
 public sealed class IdentityEndpointsTests(TestInfrastructure infrastructure)
 {
     private const string Password = "Password1";

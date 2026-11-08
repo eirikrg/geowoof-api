@@ -1,5 +1,5 @@
 # Local development environment. `docker compose up --build` starts everything; the API applies
-# migrations and loads sample data (Development). See docs/setup.md.
+# migrations and loads sample data (Development).
 # Credentials here are local-only throwaway defaults; override them in .env (see .env.example).
 name: geowoof
 
@@ -33,7 +33,7 @@ services:
       timeout: 3s
       retries: 20
 
-  # S3-compatible object storage (SeaweedFS; MinIO no longer publishes community images, see ADR-0010).
+  # S3-compatible object storage (SeaweedFS; MinIO no longer publishes community images).
   storage:
     image: chrislusf/seaweedfs:4.52
     command: server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
@@ -60,14 +60,14 @@ services:
       ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=geowoof;Username=${POSTGRES_USER:-geowoof};Password=${POSTGRES_PASSWORD:-geowoof_dev_only}
       ConnectionStrings__Redis: redis:6379
       Storage__ServiceUrl: http://storage:8333
-      # Host that clients reach for signed links. Emulator: 10.0.2.2. Physical device: see docs/setup.md.
+      # Host that clients reach for signed links. Emulator: 10.0.2.2. Physical device: the IP of this computer.
       Storage__PublicEndpoint: ${STORAGE_PUBLIC_ENDPOINT:-http://10.0.2.2:8333}
       Storage__AccessKey: geowoof
       Storage__SecretKey: geowoof_dev_only_secret
       Storage__Bucket: geowoof-media
       Storage__CreateBucketIfMissing: "true"
       Api__ExposeDocumentation: "true"
-      # Local-only signing key; production keys come from a secret store (docs/setup.md).
+      # Local-only signing key; production keys come from a secret store.
       Auth__Jwt__SigningKey: ${JWT_SIGNING_KEY:-geowoof-local-development-signing-key-change-me}
       Auth__Google__ClientIds__0: ${GOOGLE_WEB_CLIENT_ID:-}
       Email__SmtpHost: mailpit

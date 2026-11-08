@@ -24,7 +24,7 @@ public static class LiveTrackingModule
     }
 }
 
-/// <summary>Redis: nothing of this is kept, and a position that stops arriving disappears (docs/decisions/0007).</summary>
+/// <summary>Redis: nothing of this is kept, and a position that stops arriving disappears.</summary>
 internal sealed class RedisLiveStore(IConnectionMultiplexer redis, IOptions<LiveTrackingOptions> options, TimeProvider timeProvider) : ILiveStore
 {
     private const double KilometersPerDegree = 111.32;

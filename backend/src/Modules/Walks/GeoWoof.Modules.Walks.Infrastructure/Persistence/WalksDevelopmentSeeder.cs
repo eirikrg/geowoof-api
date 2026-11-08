@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GeoWoof.Modules.Walks.Infrastructure.Persistence;
 
-/// <summary>Sample walks of the sample accounts along real paths of Madrid (docs/api.md). Idempotent.</summary>
+/// <summary>Sample walks of the sample accounts along real paths of Madrid. Idempotent.</summary>
 internal sealed class WalksDevelopmentSeeder(WalksDbContext dbContext, IWalkRepository walks, IIdentityApi identity, IPetsApi pets, TimeProvider timeProvider) : IDevelopmentDataSeeder
 {
     private const string TimeZone = "Europe/Madrid";

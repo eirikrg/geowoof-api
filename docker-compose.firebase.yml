@@ -1,5 +1,5 @@
 # Real pushes, on top of docker-compose.yml. The key stays outside the repository and is only lent to the container.
-# Set FIREBASE_CREDENTIALS_FILE in .env, and see docs/setup.md (5.3) for how to use this file.
+# Set FIREBASE_CREDENTIALS_FILE in .env: the service account key of Firebase, kept outside the repository.
 services:
   api:
     environment:

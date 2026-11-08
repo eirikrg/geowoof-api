@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GeoWoof.IntegrationTests.Walks;
 
-/// <summary>The phase 3 walks contract (docs/api.md) end to end: HTTP, handlers, PostgreSQL with PostGIS, the Outbox and storage.</summary>
+/// <summary>The phase 3 walks contract end to end: HTTP, handlers, PostgreSQL with PostGIS, the Outbox and storage.</summary>
 public sealed class WalksEndpointsTests(TestInfrastructure infrastructure)
 {
     private static readonly DateTimeOffset Start = new(2026, 11, 2, 8, 0, 0, TimeSpan.Zero);

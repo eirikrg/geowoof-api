@@ -19,7 +19,7 @@ public sealed class FirebaseOptions
 {
     public const string SectionName = "Firebase";
 
-    /// <summary>The service account key, outside the repository. Without it, what would be sent goes to the log (ADR-0012).</summary>
+    /// <summary>The service account key, outside the repository. Without it, what would be sent goes to the log.</summary>
     public string? CredentialsPath { get; set; }
 }
 
@@ -200,7 +200,7 @@ internal sealed class NotificationStore(NotificationsDbContext dbContext) : INot
         dbContext.Devices.Where(device => device.UserId == userId).ExecuteDeleteAsync(cancellationToken);
 }
 
-/// <summary>Notifications for the sample account Ana (docs/api.md, phase 8). Idempotent.</summary>
+/// <summary>Notifications for the sample account Ana. Idempotent.</summary>
 internal sealed class NotificationsDevelopmentSeeder(NotificationsDbContext dbContext, IIdentityApi identity, TimeProvider timeProvider) : IDevelopmentDataSeeder
 {
     public int Order => 50;

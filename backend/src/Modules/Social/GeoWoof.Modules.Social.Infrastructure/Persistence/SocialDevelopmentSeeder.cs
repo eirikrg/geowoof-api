@@ -10,7 +10,7 @@ using SkiaSharp;
 
 namespace GeoWoof.Modules.Social.Infrastructure.Persistence;
 
-/// <summary>Relationships and posts of the sample accounts (docs/api.md, phases 5 and 6). Idempotent.</summary>
+/// <summary>Relationships and posts of the sample accounts. Idempotent.</summary>
 internal sealed partial class SocialDevelopmentSeeder(
     SocialDbContext dbContext,
     IIdentityApi identity,

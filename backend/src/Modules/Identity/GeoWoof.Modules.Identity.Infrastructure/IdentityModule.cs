@@ -63,7 +63,7 @@ public static class IdentityModule
                     NameClaimType = GeoWoofClaimTypes.Subject,
                 };
 
-                // WebSockets cannot send headers from the app: the token of a hub comes in the URL (docs/realtime.md).
+                // WebSockets cannot send headers from the app: the token of a hub comes in the URL.
                 bearer.Events = new JwtBearerEvents
                 {
                     OnMessageReceived = context =>

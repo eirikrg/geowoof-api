@@ -4,7 +4,7 @@ using GeoWoof.Modules.Identity.Domain.Verification;
 
 namespace GeoWoof.Modules.Identity.Application;
 
-/// <summary>Session, lockout and one-time code settings (configuration section <c>Auth</c>). Defaults follow ADR-0005.</summary>
+/// <summary>Session, lockout and one-time code settings (configuration section <c>Auth</c>).</summary>
 public sealed class AuthSettings
 {
     public const string SectionName = "Auth";

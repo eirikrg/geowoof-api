@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 
 namespace GeoWoof.IntegrationTests.Chat;
 
-/// <summary>The chat of phase 8 (docs/api.md and docs/realtime.md) end to end: HTTP, PostgreSQL, the hub and the Outbox.</summary>
+/// <summary>The chat of phase 8 end to end: HTTP, PostgreSQL, the hub and the Outbox.</summary>
 public sealed class ChatEndpointsTests(TestInfrastructure infrastructure)
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;

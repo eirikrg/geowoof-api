@@ -10,7 +10,7 @@ using SkiaSharp;
 
 namespace GeoWoof.IntegrationTests.Media;
 
-/// <summary>The whole upload path of ADR-0010 against real S3-compatible storage (SeaweedFS).</summary>
+/// <summary>The whole upload path (presigned upload, processing and signed links) against real S3-compatible storage (SeaweedFS).</summary>
 public sealed class MediaUploadTests(TestInfrastructure infrastructure)
 {
     private const string PetAvatar = "PetAvatar";

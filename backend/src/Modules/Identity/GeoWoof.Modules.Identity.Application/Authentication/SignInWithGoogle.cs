@@ -23,7 +23,7 @@ internal sealed class SignInWithGoogleCommandValidator : AbstractValidator<SignI
 
 /// <summary>
 /// Signs in with a Google ID token: finds the account by Google subject, links an existing account
-/// with the same email, or creates a new one (ADR-0005).
+/// with the same email, or creates a new one.
 /// </summary>
 internal sealed class SignInWithGoogleCommandHandler(
     IGoogleIdTokenValidator google,

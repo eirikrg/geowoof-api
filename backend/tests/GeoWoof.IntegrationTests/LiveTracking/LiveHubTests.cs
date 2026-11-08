@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 
 namespace GeoWoof.IntegrationTests.LiveTracking;
 
-/// <summary>The contract of phase 7 (docs/realtime.md) end to end: real clients, the hub, Redis and the backplane.</summary>
+/// <summary>The contract of phase 7 end to end: real clients, the hub, Redis and the backplane.</summary>
 public sealed class LiveHubTests(TestInfrastructure infrastructure)
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;

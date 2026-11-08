@@ -6,7 +6,7 @@ namespace GeoWoof.BuildingBlocks.Infrastructure.Persistence;
 
 /// <summary>
 /// Searches with pg_trgm and unaccent. Each module has its own <c>normalize_search_text</c> function
-/// and its own GIN indexes, because modules do not share database objects (docs/architecture.md, 3.6).
+/// and its own GIN indexes, because modules do not share database objects.
 /// </summary>
 public static class TextSearch
 {

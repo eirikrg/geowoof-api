@@ -4,7 +4,7 @@ namespace GeoWoof.Modules.Walks.Domain.Routes;
 
 /// <summary>
 /// Google's encoded polyline algorithm with precision 5 (about 1.1 m). The Android app has its own
-/// implementation: both are tested with the vectors of docs/fixtures/polyline-vectors.json.
+/// implementation: both are tested with the same vectors, in polyline-vectors.json.
 /// </summary>
 public static class Polyline
 {

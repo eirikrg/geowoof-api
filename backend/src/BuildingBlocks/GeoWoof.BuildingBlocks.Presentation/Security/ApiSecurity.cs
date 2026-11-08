@@ -6,7 +6,7 @@ namespace GeoWoof.BuildingBlocks.Presentation.Security;
 /// <summary>Authorization policy names shared by every module.</summary>
 public static class AuthorizationPolicies
 {
-    /// <summary>Authenticated user whose email address is verified (outgoing social actions, ADR-0005).</summary>
+    /// <summary>Authenticated user whose email address is verified (outgoing social actions).</summary>
     public const string VerifiedEmail = "verified-email";
 }
 

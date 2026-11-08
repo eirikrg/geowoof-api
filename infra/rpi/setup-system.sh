@@ -94,7 +94,7 @@ echo "== Automatic security updates"
 systemctl enable --quiet --now unattended-upgrades
 
 echo "== Firewall: web for everybody, SSH only from home"
-ufw --force reset >/dev/null
+# Without a reset, so that the rules added on the Raspberry Pi itself, outside this project, stay.
 ufw default deny incoming >/dev/null
 ufw default allow outgoing >/dev/null
 ufw allow from "$LAN" to any port 22 proto tcp comment 'SSH from home' >/dev/null

@@ -88,7 +88,7 @@ internal static class PetMapper
         pet.UpdatedAt);
 }
 
-/// <summary>Field rules shared by the Pets validators (documented in docs/api.md).</summary>
+/// <summary>Field rules shared by the Pets validators.</summary>
 internal static class PetValidationRules
 {
     /// <summary>

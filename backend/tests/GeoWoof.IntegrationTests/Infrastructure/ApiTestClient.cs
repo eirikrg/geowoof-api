@@ -71,7 +71,7 @@ internal static class HttpTestExtensions
         client.PutAsJsonAsync(path, body, TestContext.Current.CancellationToken);
 }
 
-/// <summary>The client side of the image upload (docs/api.md, phase 2), with real signed links.</summary>
+/// <summary>The client side of the image upload, with real signed links.</summary>
 internal static class MediaTestClient
 {
     /// <summary>Asks for a link and uploads the bytes to storage, without confirming.</summary>

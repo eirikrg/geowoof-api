@@ -8,7 +8,7 @@ using SkiaSharp;
 
 namespace GeoWoof.Modules.Pets.Infrastructure.Persistence;
 
-/// <summary>Sample pets of the sample accounts, with photos and a weight history (docs/api.md). Idempotent.</summary>
+/// <summary>Sample pets of the sample accounts, with photos and a weight history. Idempotent.</summary>
 internal sealed partial class PetsDevelopmentSeeder(
     PetsDbContext dbContext,
     IIdentityApi identity,

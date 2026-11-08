@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Nightly copy of the database and the images. On the same microSD it protects from a mistake, not from a
-# broken card: docs/deploy.md explains how to take the copies out of the Raspberry Pi.
+# broken card: taking the copies out of the Raspberry Pi is still pending.
 set -euo pipefail
 
 DIR=/var/backups/geowoof

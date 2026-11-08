@@ -33,7 +33,7 @@ public enum LiveVisibility
     Nobody = 2,
 }
 
-/// <summary>The only place that decides who sees what (docs/api.md, phase 5). A block wins over everything else.</summary>
+/// <summary>The only place that decides who sees what. A block wins over everything else.</summary>
 public static class VisibilityRules
 {
     /// <summary>A private profile only shows its content to those who follow it.</summary>
@@ -63,7 +63,7 @@ public static class VisibilityRules
 
     /// <summary>
     /// Where someone is right now is the most delicate of all: a private profile limits it too, so that
-    /// <see cref="LiveVisibility.Everyone"/> means its followers and never a stranger (docs/decisions/0007).
+    /// <see cref="LiveVisibility.Everyone"/> means its followers and never a stranger.
     /// </summary>
     public static bool CanSeeLive(ViewerRelation viewer, LiveVisibility visibility, bool isPrivateProfile) =>
         CanSeeProfileContent(viewer, isPrivateProfile) && visibility switch

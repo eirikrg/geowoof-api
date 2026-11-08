@@ -3,7 +3,7 @@ using GeoWoof.BuildingBlocks.Domain.Results;
 
 namespace GeoWoof.Modules.Chat.Domain;
 
-/// <summary>Business errors of the chat. The codes are part of the contract (docs/api.md, phase 8).</summary>
+/// <summary>Business errors of the chat. The codes are part of the contract.</summary>
 public static class ChatErrors
 {
     public static readonly Error WithYourself = Error.Validation("chat.with_yourself", "You cannot talk to yourself.");

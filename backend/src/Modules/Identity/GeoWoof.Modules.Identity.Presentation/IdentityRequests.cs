@@ -1,6 +1,6 @@
 namespace GeoWoof.Modules.Identity.Presentation;
 
-// Request bodies of the Identity endpoints (docs/api.md, phase 1). Responses are the Application DTOs.
+// Request bodies of the Identity endpoints. Responses are the Application DTOs.
 
 public sealed record ReplaceProfileRequest(string DisplayName, string? Bio, string? City, Guid? AvatarAssetId);
 

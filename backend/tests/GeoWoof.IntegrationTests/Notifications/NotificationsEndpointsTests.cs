@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GeoWoof.IntegrationTests.Notifications;
 
-/// <summary>The notifications of phase 8 (docs/api.md) end to end: the events of Social and Chat, the Outbox and the Inbox.</summary>
+/// <summary>The notifications of phase 8 end to end: the events of Social and Chat, the Outbox and the Inbox.</summary>
 public sealed class NotificationsEndpointsTests(TestInfrastructure infrastructure)
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;

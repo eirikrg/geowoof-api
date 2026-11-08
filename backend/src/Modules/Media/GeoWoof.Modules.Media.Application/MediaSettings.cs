@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GeoWoof.Modules.Media.Application;
 
-/// <summary>Image rules and background job timings (configuration section <c>Media</c>). Defaults follow ADR-0010.</summary>
+/// <summary>Image rules and background job timings (configuration section <c>Media</c>).</summary>
 public sealed class MediaSettings
 {
     public const string SectionName = "Media";

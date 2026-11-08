@@ -2,7 +2,7 @@ using GeoWoof.BuildingBlocks.Domain.Results;
 
 namespace GeoWoof.Modules.Walks.Domain;
 
-/// <summary>Business errors of the Walks module. Codes are part of the API contract (docs/api.md).</summary>
+/// <summary>Business errors of the Walks module. Codes are part of the API contract.</summary>
 public static class WalksErrors
 {
     public static readonly Error NotFound = Error.NotFound("walks.not_found", "The walk does not exist.");

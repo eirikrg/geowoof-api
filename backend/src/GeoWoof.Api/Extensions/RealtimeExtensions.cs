@@ -15,7 +15,7 @@ internal sealed class SubjectUserIdProvider : IUserIdProvider
 
 internal static class RealtimeExtensions
 {
-    /// <summary>The same JSON as the API (docs/realtime.md), and Redis so that several instances share the messages.</summary>
+    /// <summary>The same JSON as the API, and Redis so that several instances share the messages.</summary>
     public static ISignalRServerBuilder AddGeoWoofRealtime(this IServiceCollection services, IConfiguration configuration)
     {
         // The token says who someone is with `sub`, which is what messages to a person go by.

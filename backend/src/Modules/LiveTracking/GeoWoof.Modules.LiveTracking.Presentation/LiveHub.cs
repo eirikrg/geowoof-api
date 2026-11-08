@@ -18,7 +18,7 @@ public sealed record StartSharingRequest(Guid WalkId, IReadOnlyList<Guid>? PetId
 
 public sealed record PositionRequest(double Latitude, double Longitude, double? AccuracyM, DateTimeOffset RecordedAt);
 
-/// <summary>The live map (docs/realtime.md). A failure says its code, which is part of the contract, and nothing else.</summary>
+/// <summary>The live map. A failure says its code, which is part of the contract, and nothing else.</summary>
 [Authorize]
 public sealed class LiveHub(
     ICommandHandler<SubscribeViewportCommand, ViewportDto> subscribe,

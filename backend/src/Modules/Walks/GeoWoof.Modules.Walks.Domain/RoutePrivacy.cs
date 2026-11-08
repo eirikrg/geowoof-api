@@ -7,7 +7,7 @@ public sealed record VisibleRoute(IReadOnlyList<WalkSegment> Segments, IReadOnly
 
 /// <summary>
 /// Removes every point close to the start or the end of a walk, so that a route does not reveal where
-/// someone lives (ADR-0006). The zone is measured in a straight line: after walking 200 m around
+/// someone lives. The zone is measured in a straight line: after walking 200 m around
 /// a block, someone can still be next to their door.
 /// </summary>
 public static class RoutePrivacy

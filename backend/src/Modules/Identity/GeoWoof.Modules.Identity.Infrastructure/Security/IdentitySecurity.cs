@@ -35,7 +35,7 @@ public sealed class JwtOptions
     public SymmetricSecurityKey CreateSigningKey() => new(Encoding.UTF8.GetBytes(SigningKey));
 }
 
-/// <summary>Signs short-lived access tokens (HS256) with the claims of docs/api.md.</summary>
+/// <summary>Signs short-lived access tokens (HS256) with the claims of the API contract.</summary>
 internal sealed class JwtAccessTokenIssuer(IOptions<JwtOptions> jwtOptions, IOptions<AuthSettings> authSettings) : IAccessTokenIssuer
 {
     private readonly JsonWebTokenHandler _handler = new();

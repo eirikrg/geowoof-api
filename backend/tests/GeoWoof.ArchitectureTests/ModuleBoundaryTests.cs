@@ -6,7 +6,7 @@ using NetArchTest.Rules;
 namespace GeoWoof.ArchitectureTests;
 
 /// <summary>
-/// Layer and module rules from docs/architecture.md §3.3. They apply automatically to every
+/// Layer and module rules of the modular monolith. They apply automatically to every
 /// <c>GeoWoof.Modules.*</c> assembly referenced by this project.
 /// </summary>
 public sealed class ModuleBoundaryTests

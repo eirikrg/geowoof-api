@@ -124,7 +124,7 @@ internal sealed partial class MediaProcessingService(
     private static partial void LogAssetFailed(ILogger logger, Exception exception, Guid assetId);
 }
 
-/// <summary>Periodically removes images that nobody uses (ADR-0010).</summary>
+/// <summary>Periodically removes images that nobody uses.</summary>
 internal sealed partial class MediaCleanupService(
     IServiceScopeFactory scopeFactory,
     IOptions<MediaSettings> options,

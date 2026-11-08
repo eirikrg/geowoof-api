@@ -3,7 +3,7 @@ using GeoWoof.Modules.Identity.Domain.Users;
 
 namespace GeoWoof.Modules.Identity.Application;
 
-/// <summary>Field rules shared by the Identity validators (documented in docs/api.md).</summary>
+/// <summary>Field rules shared by the Identity validators.</summary>
 internal static class IdentityValidationRules
 {
     public const int PasswordMinLength = 8;

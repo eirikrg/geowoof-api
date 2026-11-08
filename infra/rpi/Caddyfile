@@ -30,3 +30,6 @@ s3.eirikrg.com {
 
 	reverse_proxy 127.0.0.1:8333
 }
+
+# Sites that only exist on this Raspberry Pi, outside this project. With none, Caddy only warns.
+import /etc/caddy/local.d/*.caddy

@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Requires Docker (Testcontainers), or GEOWOOF_TEST_POSTGRES / GEOWOOF_TEST_REDIS / GEOWOOF_TEST_STORAGE_URL. See docs/setup.md. -->
+  <!-- Requires Docker (Testcontainers), or GEOWOOF_TEST_POSTGRES / GEOWOOF_TEST_REDIS / GEOWOOF_TEST_STORAGE_URL. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>

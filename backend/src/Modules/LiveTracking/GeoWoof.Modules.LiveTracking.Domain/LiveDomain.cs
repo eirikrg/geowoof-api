@@ -3,7 +3,7 @@ using GeoWoof.BuildingBlocks.Domain.Results;
 
 namespace GeoWoof.Modules.LiveTracking.Domain;
 
-/// <summary>Business errors of the live map. The codes are part of the contract (docs/realtime.md).</summary>
+/// <summary>Business errors of the live map. The codes are part of the contract.</summary>
 public static class LiveErrors
 {
     public static readonly Error InvalidViewport = Error.Validation("live.invalid_viewport", "That is not a valid area of the map.");

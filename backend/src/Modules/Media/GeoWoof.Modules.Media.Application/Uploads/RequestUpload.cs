@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace GeoWoof.Modules.Media.Application.Uploads;
 
-/// <summary>Issues a signed link to upload an image directly to storage (ADR-0010).</summary>
+/// <summary>Issues a signed link to upload an image directly to storage.</summary>
 public sealed record RequestUploadCommand(Guid OwnerId, string ContentType, long SizeBytes, string Purpose) : ICommand<MediaUploadDto>;
 
 internal sealed class RequestUploadCommandValidator : AbstractValidator<RequestUploadCommand>

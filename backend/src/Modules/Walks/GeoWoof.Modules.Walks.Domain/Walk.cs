@@ -27,7 +27,7 @@ public sealed record WalkDetails(ContentVisibility Visibility, string? Note, IRe
 
 /// <summary>
 /// A finished walk. Its id is generated on the phone, so that retrying an upload never duplicates it.
-/// The route, dates and pets are immutable; only the note, the visibility and the photos can change (ADR-0009).
+/// The route, dates and pets are immutable; only the note, the visibility and the photos can change.
 /// </summary>
 public sealed class Walk : AggregateRoot
 {

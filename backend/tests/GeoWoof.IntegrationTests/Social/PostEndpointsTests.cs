@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GeoWoof.IntegrationTests.Social;
 
-/// <summary>The contract of phase 6 (docs/api.md) end to end: HTTP, handlers, PostgreSQL, the cache in Redis and the Outbox.</summary>
+/// <summary>The contract of phase 6 end to end: HTTP, handlers, PostgreSQL, the cache in Redis and the Outbox.</summary>
 public sealed class PostEndpointsTests(TestInfrastructure infrastructure)
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;

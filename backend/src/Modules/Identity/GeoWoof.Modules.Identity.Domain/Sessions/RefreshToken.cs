@@ -33,7 +33,7 @@ public enum RefreshTokenState
 
 /// <summary>
 /// One opaque refresh token of a session. Tokens of the same device form a family: every refresh
-/// rotates the token, and presenting an old one again revokes the whole family (ADR-0005).
+/// rotates the token, and presenting an old one again revokes the whole family.
 /// Only a SHA-256 hash of the token is stored.
 /// </summary>
 public sealed class RefreshToken : Entity

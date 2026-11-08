@@ -34,7 +34,7 @@ public static class SocialModule
 }
 
 /// <summary>
-/// In memory and in Redis (ADR-0003). Whoever changes a relationship removes the entries of both
+/// In memory and in Redis. Whoever changes a relationship removes the entries of both
 /// people after saving. With several API instances, the copy in memory of another instance can last
 /// up to <see cref="LocalExpiration"/>.
 /// </summary>

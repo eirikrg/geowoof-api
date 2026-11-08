@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GeoWoof.IntegrationTests.Pets;
 
-/// <summary>The phase 2 pets contract (docs/api.md) end to end: HTTP, handlers, PostgreSQL, the Outbox and storage.</summary>
+/// <summary>The phase 2 pets contract end to end: HTTP, handlers, PostgreSQL, the Outbox and storage.</summary>
 public sealed class PetsEndpointsTests(TestInfrastructure infrastructure)
 {
     private static object Luna(Guid? avatarAssetId = null) => new

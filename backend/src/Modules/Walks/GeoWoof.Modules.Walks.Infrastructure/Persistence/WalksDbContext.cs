@@ -11,7 +11,7 @@ using NetTopologySuite.Geometries;
 
 namespace GeoWoof.Modules.Walks.Infrastructure.Persistence;
 
-/// <summary>Schema <c>walks</c>: finished walks with their routes (ADR-0006).</summary>
+/// <summary>Schema <c>walks</c>: finished walks with their routes.</summary>
 public sealed class WalksDbContext(DbContextOptions<WalksDbContext> options) : ModuleDbContext(options), IWalksUnitOfWork
 {
     public const string SchemaName = "walks";

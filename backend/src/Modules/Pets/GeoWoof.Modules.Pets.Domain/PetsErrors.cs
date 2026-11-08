@@ -2,7 +2,7 @@ using GeoWoof.BuildingBlocks.Domain.Results;
 
 namespace GeoWoof.Modules.Pets.Domain;
 
-/// <summary>Business errors of the Pets module. Codes are part of the API contract (docs/api.md).</summary>
+/// <summary>Business errors of the Pets module. Codes are part of the API contract.</summary>
 public static class PetsErrors
 {
     public static readonly Error NotFound = Error.NotFound("pets.not_found", "The pet does not exist.");

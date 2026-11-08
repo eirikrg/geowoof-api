@@ -25,7 +25,7 @@ internal static class ProfileMapper
 {
     /// <param name="user">The account.</param>
     /// <param name="media">Signs the URLs.</param>
-    /// <param name="isRestricted">What a private profile shows to those who do not follow it (docs/api.md, phase 5).</param>
+    /// <param name="isRestricted">What a private profile shows to those who do not follow it.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     public static async Task<ProfileDto> ToDtoAsync(User user, IMediaApi media, CancellationToken cancellationToken, bool isRestricted = false)
     {

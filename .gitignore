@@ -9,7 +9,7 @@ Thumbs.db
 *.suo
 *.swp
 
-# ── Secrets and local configuration (never commit; see docs/setup.md) ──────
+# ── Secrets and local configuration (never commit) ──────
 .env
 local.properties
 secrets.properties

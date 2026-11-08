@@ -113,7 +113,7 @@ public sealed record GoogleIdentity(string Subject, string Email, bool EmailVeri
 
 public interface IGoogleIdTokenValidator
 {
-    /// <summary>False when no Google client id is configured (ADR-0012).</summary>
+    /// <summary>False when no Google client id is configured.</summary>
     bool IsEnabled { get; }
 
     /// <summary>Returns the identity, or <c>null</c> if the token is invalid, expired or for another audience.</summary>

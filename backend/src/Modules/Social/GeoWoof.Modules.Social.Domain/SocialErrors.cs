@@ -2,7 +2,7 @@ using GeoWoof.BuildingBlocks.Domain.Results;
 
 namespace GeoWoof.Modules.Social.Domain;
 
-/// <summary>Business errors of the Social module. Codes are part of the API contract (docs/api.md).</summary>
+/// <summary>Business errors of the Social module. Codes are part of the API contract.</summary>
 public static class SocialErrors
 {
     /// <summary>The same answer for a person who does not exist and for one with a block in between.</summary>

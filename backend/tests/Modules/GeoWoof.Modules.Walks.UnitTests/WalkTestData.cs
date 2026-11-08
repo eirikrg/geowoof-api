@@ -29,7 +29,7 @@ internal static class WalkTestData
 
     public static WalkTrack Track(TimeSpan duration, params WalkSegment[] segments) => WalkTrack.Parse(segments, duration).Value;
 
-    /// <summary>Reads a trace of docs/fixtures: each trkseg is a segment.</summary>
+    /// <summary>Reads a trace of the fixtures folder: each trkseg is a segment.</summary>
     public static (IReadOnlyList<WalkSegment> Segments, TimeSpan Duration) LoadGpx(string name)
     {
         XNamespace gpx = "http://www.topografix.com/GPX/1/1";

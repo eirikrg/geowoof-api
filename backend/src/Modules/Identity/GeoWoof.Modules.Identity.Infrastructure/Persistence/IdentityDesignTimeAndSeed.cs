@@ -25,7 +25,7 @@ internal sealed class IdentityDbContextDesignTimeFactory : IDesignTimeDbContextF
     }
 }
 
-/// <summary>Sample accounts for local development (docs/api.md). Idempotent.</summary>
+/// <summary>Sample accounts for local development. Idempotent.</summary>
 internal sealed class IdentityDevelopmentSeeder(IdentityDbContext dbContext, IPasswordHasher passwordHasher, TimeProvider timeProvider)
     : IDevelopmentDataSeeder
 {

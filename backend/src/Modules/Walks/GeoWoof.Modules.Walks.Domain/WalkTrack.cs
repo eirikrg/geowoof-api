@@ -8,7 +8,7 @@ public sealed record WalkSegment(string Polyline, IReadOnlyList<long> TimeOffset
 
 public readonly record struct TrackPoint(GeoPoint Position, long OffsetMs);
 
-/// <summary>The route of a walk, validated and decoded (ADR-0006).</summary>
+/// <summary>The route of a walk, validated and decoded.</summary>
 public sealed class WalkTrack
 {
     public const int MaxPoints = 20_000;
@@ -83,7 +83,7 @@ public sealed record WalkStatistics(int DistanceM, int DurationS, int MovingTime
     /// <summary>Stored with each walk, so that walks can be recalculated if the algorithm changes.</summary>
     public const int AlgorithmVersion = 1;
 
-    /// <summary>Faster than anyone walks, even running with a dog: such a step is a GPS error (ADR-0006).</summary>
+    /// <summary>Faster than anyone walks, even running with a dog: such a step is a GPS error.</summary>
     public const double ImpossibleSpeedMps = 8.5;
 
     public const double MovingSpeedMps = 0.5;

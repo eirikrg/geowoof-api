@@ -2,7 +2,7 @@ using GeoWoof.BuildingBlocks.Domain.Results;
 
 namespace GeoWoof.Modules.Media.Domain;
 
-/// <summary>Business errors of the Media module. Codes are part of the API contract (docs/api.md).</summary>
+/// <summary>Business errors of the Media module. Codes are part of the API contract.</summary>
 public static class MediaErrors
 {
     public const string InvalidImageCode = "media.invalid_image";

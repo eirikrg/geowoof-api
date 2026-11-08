@@ -172,7 +172,7 @@ internal sealed class ChatStore(ChatDbContext dbContext) : IChatStore
     }
 }
 
-/// <summary>A conversation between the sample accounts Ana and Bea (docs/api.md, phase 8). Idempotent.</summary>
+/// <summary>A conversation between the sample accounts Ana and Bea. Idempotent.</summary>
 internal sealed class ChatDevelopmentSeeder(ChatDbContext dbContext, IIdentityApi identity, TimeProvider timeProvider) : IDevelopmentDataSeeder
 {
     public int Order => 40;

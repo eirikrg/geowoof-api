@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GeoWoof.IntegrationTests.Social;
 
-/// <summary>The contract of phases 4 and 5 (docs/api.md) end to end: HTTP, handlers, PostgreSQL, the cache in Redis and the Outbox.</summary>
+/// <summary>The contract of phases 4 and 5 end to end: HTTP, handlers, PostgreSQL, the cache in Redis and the Outbox.</summary>
 public sealed class SocialEndpointsTests(TestInfrastructure infrastructure)
 {
     private static readonly DateTimeOffset Start = new(2026, 11, 2, 8, 0, 0, TimeSpan.Zero);

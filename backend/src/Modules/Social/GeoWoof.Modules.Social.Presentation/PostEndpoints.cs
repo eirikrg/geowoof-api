@@ -14,7 +14,7 @@ public sealed record PostBody(string? Text, string? Visibility, IReadOnlyList<Gu
 
 public sealed record CommentBody(string? Text);
 
-/// <summary>Posts, what people do with them, and the lists that show them (docs/api.md, phase 6).</summary>
+/// <summary>Posts, what people do with them, and the lists that show them.</summary>
 public static class PostEndpoints
 {
     public static IEndpointRouteBuilder MapPostEndpoints(this IEndpointRouteBuilder api)

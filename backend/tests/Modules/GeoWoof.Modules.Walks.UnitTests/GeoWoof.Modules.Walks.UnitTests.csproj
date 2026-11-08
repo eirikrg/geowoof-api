@@ -13,8 +13,8 @@
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Shared with the Android tests. -->
-    <Content Include="..\..\..\..\docs\fixtures\*.json;..\..\..\..\docs\fixtures\*.gpx" LinkBase="fixtures" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The same polyline vectors and GPX traces as the tests of the Android app. -->
+    <Content Include="fixtures\*.json;fixtures\*.gpx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Shouldly" />
