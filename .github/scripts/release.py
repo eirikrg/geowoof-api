@@ -1,5 +1,9 @@
-"""Gives a pull request merged into main the next version, vX.Y.Z with one more in the last number, and
-publishes a GitHub release that also names the latest version of the other repository at that moment.
+"""Gives a pull request merged into main the next version and publishes a GitHub release that also names the
+latest version of the other repository at that moment.
+
+Before 1.0.0 every pull request adds one to the last number. From 1.0.0 on, a feature (a title that starts with
+feat, or a branch that starts with feat/) adds one to the middle number and sets the last one to 0, and anything
+else, such as a fix, adds one to the last number. 1.0.0 itself, and any later major version, is tagged by hand.
 
 The release workflow runs it on every push to main; a push that is not the merge of a pull request gets no
 version. With --dry-run it only prints what it would publish, and needs no token.
@@ -12,6 +16,7 @@ import subprocess
 import urllib.request
 
 TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+FEATURE = re.compile(r"^feat(\([^)]*\))?!?:")
 
 
 def git(*args):
@@ -32,6 +37,13 @@ def api(method, path, body=None):
 def latest(tags):
     versions = [tuple(int(part) for part in match.groups()) for match in map(TAG.match, tags) if match]
     return max(versions) if versions else None
+
+
+def next_version(current, title, branch):
+    major, minor, patch = current
+    if major >= 1 and (FEATURE.match(title) or branch.startswith("feat/")):
+        return major, minor + 1, 0
+    return major, minor, patch + 1
 
 
 def name(version):
@@ -58,7 +70,7 @@ def main():
         print("This commit already has a version.")
         return
     current = latest(git("tag", "--list", "v*").split()) or (0, 0, 0)
-    version = name((current[0], current[1], current[2] + 1))
+    version = name(next_version(current, pull["title"], pull["head"]["ref"]))
 
     remote = git("ls-remote", "--tags", "--refs", f"https://github.com/{args.other_repo}.git", "v*")
     other = latest(line.rsplit("refs/tags/", 1)[-1] for line in remote.splitlines())
