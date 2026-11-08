@@ -41,3 +41,6 @@ obj/
 TestResults/
 *.trx
 artifacts/
+
+# Python bytecode of the CI scripts
+__pycache__/

@@ -1,0 +1,30 @@
+name: Release
+
+# Each pull request merged into main gets the next version (one more in the last number) and a GitHub
+# release that names the latest version of the Android app at that moment.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  version:
+    name: Version the merged pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Tag and publish the release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/release.py --other-repo eirikrg/geowoof-and --other-name App
