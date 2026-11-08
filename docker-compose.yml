@@ -87,7 +87,7 @@ services:
         condition: service_started
 
   aspire-dashboard:
-    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.4
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6
     profiles: ["observability"]
     environment:
       ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
