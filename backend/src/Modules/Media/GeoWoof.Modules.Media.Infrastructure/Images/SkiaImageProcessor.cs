@@ -26,52 +26,82 @@ internal sealed class SkiaImageProcessor : IImageProcessor
             return Rejected(MediaErrors.InvalidImageCode);
         }
 
-        if ((long)codec.Info.Width * codec.Info.Height > maxPixels)
+        var (width, height) = (codec.Info.Width, codec.Info.Height);
+        if ((long)width * height > maxPixels)
         {
             return Rejected(MediaErrors.ImageTooLargeCode);
         }
 
-        using var decoded = SKBitmap.Decode(codec);
+        // Nothing larger than the medium variant is kept, so the whole picture is never needed: JPEG and WebP decode
+        // straight to a fraction of their size, which takes a fraction of the time and of the memory.
+        var medium = FitWithin(width, height, MediumSize);
+        using var decoded = Decode(codec, medium);
         if (decoded is null)
         {
             return Rejected(MediaErrors.InvalidImageCode);
         }
 
-        using var upright = ApplyOrigin(decoded, codec.EncodedOrigin);
-        var (mediumWidth, mediumHeight) = FitWithin(upright, MediumSize);
+        // Turned upright once it is small: the same pixels, with much less to move. Most are upright already.
+        using var resized = decoded.Width == medium.Width && decoded.Height == medium.Height ? null : Resize(decoded, medium);
+        var small = resized ?? decoded;
+        using var turned = codec.EncodedOrigin == SKEncodedOrigin.TopLeft ? null : ApplyOrigin(small, codec.EncodedOrigin);
+        var upright = turned ?? small;
+        var thumb = FitWithin(upright.Width, upright.Height, ThumbSize);
         return new ImageProcessingResult(
-            new ImageVariants(mediumWidth, mediumHeight, Encode(upright, ThumbSize), Encode(upright, MediumSize)),
+            new ImageVariants(upright.Width, upright.Height, Encode(upright, thumb), Encode(upright, (upright.Width, upright.Height))),
             RejectionCode: null);
     }
 
     private static ImageProcessingResult Rejected(string code) => new(Variants: null, code);
 
-    private static byte[] Encode(SKBitmap source, int maxSize)
+    /// <summary>
+    /// Decodes at the smallest size the codec offers that is still at least <paramref name="target"/>. A codec that
+    /// cannot scale, such as PNG, decodes the whole picture, which is what the limit of pixels is for.
+    /// </summary>
+    private static SKBitmap? Decode(SKCodec codec, (int Width, int Height) target)
     {
-        var (width, height) = FitWithin(source, maxSize);
-        if (width == source.Width && height == source.Height)
+        var info = codec.Info;
+        // A sixteenth more than needed: JPEG rounds to the nearest eighth, which could be smaller than the target.
+        var scale = Math.Min(1f, ((float)target.Width / info.Width) + (1f / 16));
+        var size = codec.GetScaledDimensions(scale);
+        if (size.Width < target.Width || size.Height < target.Height)
+        {
+            size = info.Size;
+        }
+
+        // As SKBitmap.Decode does: premultiplied alpha and no colour space.
+        var alpha = info.AlphaType == SKAlphaType.Unpremul ? SKAlphaType.Premul : info.AlphaType;
+        return SKBitmap.Decode(codec, new SKImageInfo(size.Width, size.Height, info.ColorType, alpha));
+    }
+
+    private static SKBitmap Resize(SKBitmap source, (int Width, int Height) size) =>
+        source.Resize(new SKImageInfo(size.Width, size.Height, source.ColorType, source.AlphaType), Sampling)
+            ?? throw new InvalidOperationException("The image could not be resized.");
+
+    private static byte[] Encode(SKBitmap source, (int Width, int Height) size)
+    {
+        if (size.Width == source.Width && size.Height == source.Height)
         {
             using var unscaled = source.Encode(SKEncodedImageFormat.Webp, WebPQuality);
             return unscaled.ToArray();
         }
 
-        using var resized = source.Resize(new SKImageInfo(width, height, source.ColorType, source.AlphaType), Sampling)
-            ?? throw new InvalidOperationException("The image could not be resized.");
+        using var resized = Resize(source, size);
         using var encoded = resized.Encode(SKEncodedImageFormat.Webp, WebPQuality);
         return encoded.ToArray();
     }
 
     /// <summary>The size that fits <paramref name="maxSize"/> on the longest side. Images are never enlarged.</summary>
-    private static (int Width, int Height) FitWithin(SKBitmap source, int maxSize)
+    private static (int Width, int Height) FitWithin(int width, int height, int maxSize)
     {
-        var longest = Math.Max(source.Width, source.Height);
+        var longest = Math.Max(width, height);
         if (longest <= maxSize)
         {
-            return (source.Width, source.Height);
+            return (width, height);
         }
 
         var scale = (double)maxSize / longest;
-        return (Math.Max(1, (int)Math.Round(source.Width * scale)), Math.Max(1, (int)Math.Round(source.Height * scale)));
+        return (Math.Max(1, (int)Math.Round(width * scale)), Math.Max(1, (int)Math.Round(height * scale)));
     }
 
     /// <summary>Applies the EXIF orientation to the pixels, because the variants no longer carry it.</summary>

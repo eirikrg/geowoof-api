@@ -73,6 +73,24 @@ public sealed class SkiaImageProcessorTests
         bottom.Red.ShouldBeLessThan((byte)60);
     }
 
+    [Fact]
+    public void A_large_photo_is_decoded_small_and_still_turned_upright()
+    {
+        // Large enough for the codec to decode it at a fraction of its size, and taken with the phone upright.
+        var variants = Process(TestImages.Jpeg(2000, 1000, exifOrientation: 6));
+
+        (variants.Width, variants.Height).ShouldBe((540, 1080));
+        SizeOf(variants.Medium).ShouldBe((540, 1080));
+        SizeOf(variants.Thumb).ShouldBe((160, 320));
+        using var bitmap = SKBitmap.Decode(variants.Medium.ToArray());
+        var top = bitmap.GetPixel(270, 200);
+        var bottom = bitmap.GetPixel(270, 880);
+        top.Red.ShouldBeGreaterThan((byte)200);
+        top.Blue.ShouldBeLessThan((byte)60);
+        bottom.Blue.ShouldBeGreaterThan((byte)200);
+        bottom.Red.ShouldBeLessThan((byte)60);
+    }
+
     [Theory]
     [InlineData("this is not an image")]
     [InlineData("<svg xmlns='http://www.w3.org/2000/svg'/>")]
