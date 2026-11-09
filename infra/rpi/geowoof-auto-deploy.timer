@@ -1,0 +1,10 @@
+[Unit]
+Description=Look for a new release of the GeoWoof API every few minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=30s
+
+[Install]
+WantedBy=timers.target
