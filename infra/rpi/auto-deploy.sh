@@ -159,6 +159,8 @@ if [ "$ready" != true ]; then
   if [ -n "$previous" ] && [ -d "$previous" ] && [ "$previous" != "$target" ]; then
     ln -sfn "$previous" "$CURRENT"
     systemctl restart geowoof-api
+    # Kept, it would take the place of a version that works among the ones to go back to.
+    rm -rf "$target"
     back="It went back to $(cat "$previous/SOURCE" 2>/dev/null || echo "$previous")."
   else
     back="There was no previous version to go back to."
