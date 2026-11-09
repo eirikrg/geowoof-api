@@ -9,6 +9,7 @@ using GeoWoof.Modules.Identity.Infrastructure.Persistence;
 using GeoWoof.Modules.Identity.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -23,7 +24,11 @@ public static class IdentityModule
     public static IServiceCollection AddIdentityModule(this IServiceCollection services)
     {
         services.AddOptions<AuthSettings>().BindConfiguration(AuthSettings.SectionName).ValidateDataAnnotations().ValidateOnStart();
-        services.AddOptions<JwtOptions>().BindConfiguration(JwtOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<JwtOptions>().BindConfiguration(JwtOptions.SectionName).ValidateDataAnnotations()
+            .Validate<IHostEnvironment>(
+                (jwt, environment) => JwtOptions.IsAllowedIn(environment, jwt.SigningKey),
+                "Auth:Jwt:SigningKey is the development key, which is public. Set a key of your own.")
+            .ValidateOnStart();
         services.AddOptions<GoogleAuthOptions>().BindConfiguration(GoogleAuthOptions.SectionName);
         services.AddOptions<EmailOptions>().BindConfiguration(EmailOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
 

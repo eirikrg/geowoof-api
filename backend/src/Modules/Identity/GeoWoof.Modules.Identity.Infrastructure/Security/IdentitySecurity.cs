@@ -9,6 +9,7 @@ using GeoWoof.Modules.Identity.Application.Abstractions;
 using GeoWoof.Modules.Identity.Domain.Users;
 using GeoWoof.Modules.Identity.Domain.Verification;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -33,6 +34,19 @@ public sealed class JwtOptions
     public string SigningKey { get; set; } = string.Empty;
 
     public SymmetricSecurityKey CreateSigningKey() => new(Encoding.UTF8.GetBytes(SigningKey));
+
+    /// <summary>
+    /// The key of <c>docker-compose.yml</c> and of the example settings starts like this. The repository is public, so
+    /// anyone could sign tokens for any account with it: outside development the API does not start with it.
+    /// </summary>
+    internal const string PublicDevelopmentKeyPrefix = "geowoof-local-";
+
+    public static bool IsAllowedIn(IHostEnvironment environment, string signingKey)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        return environment.IsDevelopment()
+            || !(signingKey ?? string.Empty).StartsWith(PublicDevelopmentKeyPrefix, StringComparison.Ordinal);
+    }
 }
 
 /// <summary>Signs short-lived access tokens (HS256) with the claims of the API contract.</summary>
