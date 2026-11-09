@@ -22,6 +22,7 @@ function Invoke-Pi([string]$Command) {
     if ($LASTEXITCODE -ne 0) { throw "Failed on the Raspberry Pi: $Command" }
 }
 
+$markedBusy = $false
 try {
     Write-Host "== Compiling for linux-arm64 ($release)"
     # Self-contained: the Raspberry Pi needs no .NET. ReadyToRun: starts much faster on a Raspberry Pi 3.
@@ -38,6 +39,12 @@ try {
     Write-Host "== Uploading $([math]::Round((Get-Item $archive).Length / 1MB)) MB"
     & scp -q -o BatchMode=yes $archive "${PiHost}:/tmp/geowoof-$release.tar.gz"
     if ($LASTEXITCODE -ne 0) { throw 'Could not upload the release.' }
+
+    # geowoof-auto-deploy waits while this file exists, and this waits while it is publishing a release.
+    & ssh @ssh 'sudo install -d -m 755 /var/lib/geowoof-deploy && sudo flock -n /var/lib/geowoof-deploy/lock true > /dev/null 2>&1'
+    if ($LASTEXITCODE -ne 0) { throw 'The Raspberry Pi is publishing a release of GitHub. Try again in a few minutes.' }
+    Invoke-Pi 'sudo touch /run/geowoof-deploy.busy'
+    $markedBusy = $true
 
     Write-Host '== Backup of the database before the migrations'
     Invoke-Pi 'sudo install -d -m 700 /var/backups/geowoof/pre-deploy && sudo runuser -u postgres -- pg_dump --format=custom --dbname=geowoof | sudo tee /var/backups/geowoof/pre-deploy/latest.dump > /dev/null'
@@ -68,5 +75,6 @@ try {
     Write-Host "== Version $release ready"
 }
 finally {
+    if ($markedBusy) { & ssh @ssh 'sudo rm -f /run/geowoof-deploy.busy > /dev/null 2>&1' }
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $publish, "$publish.tar.gz"
 }

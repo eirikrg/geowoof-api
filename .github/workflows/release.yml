@@ -25,13 +25,49 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      version: ${{ steps.publish.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Tag and publish the release
+        id: publish
         env:
           GITHUB_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: python3 .github/scripts/release.py --other-repo eirikrg/geowoof-and --other-name App --version "$VERSION"
+
+  # The Raspberry Pi looks for new releases by itself (infra/rpi/auto-deploy.sh) and publishes this package.
+  raspberry-pi:
+    name: Package the API for the Raspberry Pi
+    needs: version
+    if: needs.version.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TAG: v${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.version.outputs.version }}
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      # The same as deploy.ps1: self-contained, so the Raspberry Pi needs no .NET, and ReadyToRun, which starts
+      # much faster on a Raspberry Pi 3.
+      - name: Compile for linux-arm64
+        run: |
+          dotnet publish backend/src/GeoWoof.Api/GeoWoof.Api.csproj --configuration Release --runtime linux-arm64 \
+            --self-contained true -p:PublishReadyToRun=true -p:UseAppHost=true --output publish --nologo
+          echo "$TAG $(git rev-parse HEAD)" > publish/SOURCE
+          tar -czf geowoof-api-linux-arm64.tar.gz -C publish .
+          sha256sum geowoof-api-linux-arm64.tar.gz > geowoof-api-linux-arm64.tar.gz.sha256
+
+      - name: Attach it to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" geowoof-api-linux-arm64.tar.gz geowoof-api-linux-arm64.tar.gz.sha256 --repo "$GITHUB_REPOSITORY"

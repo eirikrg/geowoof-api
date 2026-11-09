@@ -1,0 +1,10 @@
+[Unit]
+Description=Publish the latest release of the GeoWoof API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/geowoof-auto-deploy
+# Downloading, the copy of the database and the wait for the API, with room to spare.
+TimeoutStartSec=30min

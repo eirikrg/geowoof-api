@@ -16,7 +16,7 @@ export DEBIAN_FRONTEND=noninteractive
 echo "== Packages"
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends \
-  ca-certificates curl gnupg libicu76 unattended-upgrades ufw caddy redis-server
+  ca-certificates curl gnupg libicu76 python3 unattended-upgrades ufw caddy redis-server
 
 echo "== PostgreSQL 18 and PostGIS (PGDG repository: Debian 13 only has PostgreSQL 17)"
 if [ ! -f /etc/apt/sources.list.d/pgdg.sources ]; then
@@ -70,9 +70,15 @@ install -m 750 -o root -g root "$HERE/backup.sh" /usr/local/sbin/geowoof-backup
 install -m 644 -o root -g root "$HERE/geowoof-backup.service" /etc/systemd/system/geowoof-backup.service
 install -m 644 -o root -g root "$HERE/geowoof-backup.timer" /etc/systemd/system/geowoof-backup.timer
 
+echo "== Each release of GitHub, published by itself"
+install -d -m 755 -o root -g root /var/lib/geowoof-deploy
+install -m 750 -o root -g root "$HERE/auto-deploy.sh" /usr/local/sbin/geowoof-auto-deploy
+install -m 644 -o root -g root "$HERE/geowoof-auto-deploy.service" /etc/systemd/system/geowoof-auto-deploy.service
+install -m 644 -o root -g root "$HERE/geowoof-auto-deploy.timer" /etc/systemd/system/geowoof-auto-deploy.timer
+
 systemctl daemon-reload
 systemctl enable --quiet seaweedfs geowoof-api
-systemctl enable --quiet --now geowoof-backup.timer
+systemctl enable --quiet --now geowoof-backup.timer geowoof-auto-deploy.timer
 
 echo "== Logs: limited, so that they do not wear the microSD or fill it"
 install -d /etc/systemd/journald.conf.d
