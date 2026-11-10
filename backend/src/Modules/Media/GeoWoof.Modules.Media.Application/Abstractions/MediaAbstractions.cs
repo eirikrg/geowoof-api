@@ -37,7 +37,11 @@ public interface IMediaAssetRepository
 /// <summary>Saves the Media module's changes in one transaction (with its Outbox).</summary>
 public interface IMediaUnitOfWork
 {
+    /// <exception cref="BuildingBlocks.Application.Persistence.ConcurrencyConflictException">The asset changed since it was read.</exception>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Forgets a failed save, so that the next read gets what is really stored.</summary>
+    void DiscardChanges();
 }
 
 public sealed record StoredObjectInfo(long SizeBytes, string? ContentType);

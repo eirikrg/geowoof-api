@@ -1,3 +1,4 @@
+using GeoWoof.BuildingBlocks.Application.Persistence;
 using GeoWoof.Modules.Media.Application;
 using GeoWoof.Modules.Media.Application.Abstractions;
 using GeoWoof.Modules.Media.Application.Processing;
@@ -152,6 +153,50 @@ public sealed class MediaWorkflowTests
     }
 
     [Fact]
+    public async Task An_image_that_the_processor_changes_meanwhile_is_still_attached_and_released()
+    {
+        var asset = await ConfirmedAssetAsync();
+        asset.MarkReady(10, 10);
+        var api = Api();
+
+        _unitOfWork.ConflictsToSimulate = 2;
+        (await api.AttachAsync(asset.Id, Owner, MediaUsage.PetAvatar, Token)).ShouldBeNull();
+        asset.IsAttached.ShouldBeTrue();
+
+        _unitOfWork.ConflictsToSimulate = 1;
+        await api.ReleaseAsync(asset.Id, Owner, Token);
+        asset.IsAttached.ShouldBeFalse();
+        _unitOfWork.Discards.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Attaching_gives_up_when_the_image_keeps_changing()
+    {
+        var asset = await ConfirmedAssetAsync();
+        _unitOfWork.ConflictsToSimulate = 3;
+
+        await Should.ThrowAsync<ConcurrencyConflictException>(() => Api().AttachAsync(asset.Id, Owner, MediaUsage.PetAvatar, Token));
+        _unitOfWork.Discards.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Processing_finishes_although_the_image_is_attached_meanwhile()
+    {
+        var asset = await ConfirmedAssetAsync();
+        _images.Result = new ImageProcessingResult(Clean, RejectionCode: null);
+
+        // The first save of each step (ready, and the original removed) finds the asset changed.
+        _unitOfWork.ConflictsToSimulate = 1;
+        _storage.BeforeDelete = () => _unitOfWork.ConflictsToSimulate = 1;
+        await Processor().ProcessAsync(asset.Id, Token);
+
+        asset.Status.ShouldBe(MediaAssetStatus.Ready);
+        asset.OriginalRemoved.ShouldBeTrue();
+        _storage.Objects.ShouldNotContainKey(asset.OriginalKey);
+        _unitOfWork.Discards.ShouldBe(2);
+    }
+
+    [Fact]
     public async Task Unconfirmed_and_rejected_images_cannot_be_attached()
     {
         var pending = MediaAsset.Request(Guid.CreateVersion7(), Owner, MediaPurpose.PetAvatar, "image/jpeg", 3, _time.GetUtcNow(), _time.GetUtcNow().AddMinutes(5));
@@ -276,6 +321,9 @@ internal sealed class FakeStorage : IMediaStorage
 
     public bool FailDeletes { get; set; }
 
+    /// <summary>Runs before each deletion, to change things between the two saves of the processor.</summary>
+    public Action? BeforeDelete { get; set; }
+
     public Task EnsureReadyAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Uri CreateUploadUrl(string key, string contentType, DateTimeOffset expiresAt) => new($"https://storage.test/put/{key}");
@@ -295,6 +343,7 @@ internal sealed class FakeStorage : IMediaStorage
 
     public Task DeleteAsync(IReadOnlyCollection<string> keys, CancellationToken cancellationToken)
     {
+        BeforeDelete?.Invoke();
         if (FailDeletes)
         {
             throw new IOException("The storage is not available.");
@@ -325,5 +374,21 @@ internal sealed class FakeSignal : IMediaProcessingSignal
 
 internal sealed class FakeUnitOfWork : IMediaUnitOfWork
 {
-    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
+    /// <summary>How many of the next saves find the asset changed by someone else.</summary>
+    public int ConflictsToSimulate { get; set; }
+
+    public int Discards { get; private set; }
+
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        if (ConflictsToSimulate > 0)
+        {
+            ConflictsToSimulate--;
+            throw new ConcurrencyConflictException("changed");
+        }
+
+        return Task.FromResult(1);
+    }
+
+    public void DiscardChanges() => Discards++;
 }
