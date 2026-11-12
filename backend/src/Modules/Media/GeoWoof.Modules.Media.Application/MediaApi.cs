@@ -1,3 +1,4 @@
+using GeoWoof.BuildingBlocks.Application.Persistence;
 using GeoWoof.Modules.Media.Application.Abstractions;
 using GeoWoof.Modules.Media.Contracts;
 using GeoWoof.Modules.Media.Domain;
@@ -25,37 +26,50 @@ internal sealed class MediaApi(
 
     public async Task<MediaAttachFailure?> AttachAsync(Guid assetId, Guid ownerId, MediaUsage usage, CancellationToken cancellationToken)
     {
-        var asset = await assets.GetByIdAsync(assetId, cancellationToken);
-        if (asset is null || asset.OwnerId != ownerId)
+        for (var attempt = 1; ; attempt++)
         {
-            return NotFound;
-        }
+            var asset = await assets.GetByIdAsync(assetId, cancellationToken);
+            if (asset is null || asset.OwnerId != ownerId)
+            {
+                return NotFound;
+            }
 
-        if (asset.Purpose != ToPurpose(usage))
-        {
-            return WrongPurpose;
-        }
+            if (asset.Purpose != ToPurpose(usage))
+            {
+                return WrongPurpose;
+            }
 
-        switch (asset.Status)
-        {
-            case MediaAssetStatus.Pending:
-                return NotUploaded;
-            case MediaAssetStatus.Rejected:
-                return Rejected;
-        }
+            switch (asset.Status)
+            {
+                case MediaAssetStatus.Pending:
+                    return NotUploaded;
+                case MediaAssetStatus.Rejected:
+                    return Rejected;
+            }
 
-        asset.Attach();
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        return null;
+            asset.Attach();
+            if (await TrySaveAsync(attempt, cancellationToken))
+            {
+                return null;
+            }
+        }
     }
 
     public async Task ReleaseAsync(Guid assetId, Guid ownerId, CancellationToken cancellationToken)
     {
-        var asset = await assets.GetByIdAsync(assetId, cancellationToken);
-        if (asset is not null && asset.OwnerId == ownerId)
+        for (var attempt = 1; ; attempt++)
         {
+            var asset = await assets.GetByIdAsync(assetId, cancellationToken);
+            if (asset is null || asset.OwnerId != ownerId)
+            {
+                return;
+            }
+
             asset.Release(timeProvider.GetUtcNow());
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            if (await TrySaveAsync(attempt, cancellationToken))
+            {
+                return;
+            }
         }
     }
 
@@ -85,6 +99,25 @@ internal sealed class MediaApi(
         return asset.Id;
     }
 
+    /// <summary>
+    /// The processor saves an image twice, when it is ready and again once the original is deleted, so a client that
+    /// uses it as soon as it is ready can find it changed in between. Attaching or releasing does not depend on that
+    /// change: on a conflict, the asset is read again and the change repeated.
+    /// </summary>
+    private async Task<bool> TrySaveAsync(int attempt, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (ConcurrencyConflictException) when (attempt < MediaAssetChanges.MaxSaveAttempts)
+        {
+            unitOfWork.DiscardChanges();
+            return false;
+        }
+    }
+
     private MediaImage ToImage(MediaAsset asset, DateTimeOffset expiresAt) =>
         asset.Status == MediaAssetStatus.Ready
             ? new MediaImage(
@@ -102,4 +135,10 @@ internal sealed class MediaApi(
         MediaUsage.ChatImage => MediaPurpose.ChatImage,
         _ => throw new ArgumentOutOfRangeException(nameof(usage), usage, "Unknown media usage."),
     };
+}
+
+/// <summary>Requests and the processor change the same asset: who finds it changed tries again, this many times in all.</summary>
+internal static class MediaAssetChanges
+{
+    public const int MaxSaveAttempts = 3;
 }

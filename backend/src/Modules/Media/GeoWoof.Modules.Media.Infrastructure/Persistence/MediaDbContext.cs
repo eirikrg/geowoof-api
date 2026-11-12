@@ -16,6 +16,8 @@ public sealed class MediaDbContext(DbContextOptions<MediaDbContext> options) : M
 
     public DbSet<MediaAsset> Assets => Set<MediaAsset>();
 
+    public void DiscardChanges() => ChangeTracker.Clear();
+
     protected override void ConfigureModule(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfiguration(new MediaAssetConfiguration());
 }

@@ -2,9 +2,11 @@ using System.Net;
 using System.Text;
 using GeoWoof.IntegrationTests.Infrastructure;
 using GeoWoof.Modules.Media.Application.Abstractions;
+using GeoWoof.Modules.Media.Contracts;
 using GeoWoof.Modules.Media.Domain;
 using GeoWoof.Modules.Media.Infrastructure.Persistence;
 using GeoWoof.TestSupport;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SkiaSharp;
 
@@ -121,6 +123,34 @@ public sealed class MediaUploadTests(TestInfrastructure infrastructure)
         confirm.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    /// <summary>
+    /// The processor saves an image again after deleting its original, so a client that uses the image as soon as it
+    /// is ready can read the row before that save and write it after. Here another connection changes the row between
+    /// the two, every time.
+    /// </summary>
+    [Fact]
+    public async Task An_image_changed_by_the_processor_meanwhile_is_still_attached_and_released()
+    {
+        await using var api = await ApiFactory.WithFreshDatabaseAsync(infrastructure);
+        using var user = await TestUser.RegisterAsync(api, "ana@example.com");
+        var ready = await MediaTestClient.UploadReadyAsync(api, user.Client, TestImages.Jpeg(100, 100), PetAvatar);
+        var assetId = ready.GetProperty("id").GetGuid();
+        var token = TestContext.Current.CancellationToken;
+
+        await using var request = api.Services.CreateAsyncScope();
+        var media = request.ServiceProvider.GetRequiredService<IMediaApi>();
+        await request.ServiceProvider.GetRequiredService<IMediaAssetRepository>().GetByIdAsync(assetId, token);
+        await ChangeRowAsync(api, assetId);
+        (await media.AttachAsync(assetId, user.Id, MediaUsage.PetAvatar, token)).ShouldBeNull();
+        await ChangeRowAsync(api, assetId);
+        await media.ReleaseAsync(assetId, user.Id, token);
+
+        await using var verification = api.Services.CreateAsyncScope();
+        var stored = await verification.ServiceProvider.GetRequiredService<IMediaAssetRepository>().GetByIdAsync(assetId, token);
+        stored!.IsAttached.ShouldBeFalse();
+        stored.ReleasedAt.ShouldNotBeNull();
+    }
+
     [Fact]
     public async Task An_image_that_keeps_failing_is_given_up()
     {
@@ -179,5 +209,15 @@ public sealed class MediaUploadTests(TestInfrastructure infrastructure)
         first.StatusCode.ShouldBe(HttpStatusCode.Created);
         second.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
         (await second.JsonAsync()).GetProperty("code").GetString().ShouldBe("media.quota_exceeded");
+    }
+
+    /// <summary>Any update gives the row a new <c>xmin</c>, as the processor's last save does.</summary>
+    private static async Task ChangeRowAsync(ApiFactory api, Guid assetId)
+    {
+        await using var scope = api.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<MediaDbContext>();
+        await context.Database.ExecuteSqlAsync(
+            $"UPDATE media.media_assets SET original_removed = TRUE WHERE id = {assetId}",
+            TestContext.Current.CancellationToken);
     }
 }

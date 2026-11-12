@@ -1,3 +1,4 @@
+using GeoWoof.BuildingBlocks.Application.Persistence;
 using GeoWoof.Modules.Media.Application.Abstractions;
 using GeoWoof.Modules.Media.Domain;
 using Microsoft.Extensions.Options;
@@ -24,22 +25,55 @@ public sealed class MediaAssetProcessor(
 
         var original = await storage.ReadAsync(asset.OriginalKey, cancellationToken);
         var result = imageProcessor.Process(original, settings.Value.MaxImagePixels);
+        Action<MediaAsset> finish;
         if (result.Variants is { } variants)
         {
             await storage.WriteAsync(asset.ThumbKey, variants.Thumb, WebP, cancellationToken);
             await storage.WriteAsync(asset.MediumKey, variants.Medium, WebP, cancellationToken);
-            asset.MarkReady(variants.Width, variants.Height);
+            finish = processed => processed.MarkReady(variants.Width, variants.Height);
         }
         else
         {
-            asset.Reject(result.RejectionCode ?? MediaErrors.InvalidImageCode);
+            var reason = result.RejectionCode ?? MediaErrors.InvalidImageCode;
+            finish = processed => processed.Reject(reason);
         }
 
         // Saved first: if the deletion fails, the cleanup retries it, and clients never see a half-finished image.
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        await storage.DeleteAsync([asset.OriginalKey], cancellationToken);
-        asset.MarkOriginalRemoved();
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        if (await ChangeAsync(asset, finish, cancellationToken) is not { } finished)
+        {
+            return;
+        }
+
+        await storage.DeleteAsync([finished.OriginalKey], cancellationToken);
+        await ChangeAsync(finished, processed => processed.MarkOriginalRemoved(), cancellationToken);
+    }
+
+    /// <summary>
+    /// Applies a change and saves it. The owner can attach or release the image while it is processed: on a conflict,
+    /// the asset is read again and the change repeated, because neither depends on the other. Null if it was deleted.
+    /// </summary>
+    private async Task<MediaAsset?> ChangeAsync(MediaAsset asset, Action<MediaAsset> change, CancellationToken cancellationToken)
+    {
+        var assetId = asset.Id;
+        for (var attempt = 1; ; attempt++)
+        {
+            change(asset);
+            try
+            {
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                return asset;
+            }
+            catch (ConcurrencyConflictException) when (attempt < MediaAssetChanges.MaxSaveAttempts)
+            {
+                unitOfWork.DiscardChanges();
+                if (await assets.GetByIdAsync(assetId, cancellationToken) is not { } current)
+                {
+                    return null;
+                }
+
+                asset = current;
+            }
+        }
     }
 
     /// <summary>A processing attempt failed unexpectedly: gives up once the attempts run out. Until then, the lease expiry retries it.</summary>
