@@ -35,7 +35,7 @@ services:
 
   # S3-compatible object storage (SeaweedFS; MinIO no longer publishes community images).
   storage:
-    image: chrislusf/seaweedfs:4.52
+    image: chrislusf/seaweedfs:4.53
     command: server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
     ports:
       - "8333:8333" # S3 API, which a phone needs for the images
